@@ -4,13 +4,11 @@ on:
   release:
     types: [published]
 
-permissions:
-  contents: write
-  packages: write
-
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       - uses: actions/checkout@v3
@@ -43,7 +41,8 @@ jobs:
           cd release
           zip -r ../up-gsap-animate.zip .
 
-      - name: Upload Release Asset
-        uses: softprops/action-gh-release@v1
+      - uses: ncipollo/release-action@v1
         with:
-          files: up-gsap-animate.zip
+          artifacts: "up-gsap-animate.zip"
+          allowUpdates: true
+          token: ${{ secrets.GITHUB_TOKEN }}
