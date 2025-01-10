@@ -1,4 +1,4 @@
-name: Build and Release
+name: Release Plugin
 
 on:
   release:
@@ -7,43 +7,45 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-
+    permissions:
+      contents: write
+    
     steps:
       - uses: actions/checkout@v3
-
+      
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '18'
+          node-version: '20'
           cache: 'npm'
-
+          
       - name: Install dependencies
-        run: npm ci
-
+        run: |
+          npm install
+          npm install @wordpress/scripts@30.8.1 --save-dev
+        
       - name: Build
         run: npm run build
-
-      - name: Create release artifact
+        
+      - name: Create plugin archive
         run: |
-          # Create a temporary directory for the release
-          mkdir release
-          # Copy all necessary files
-          cp -r build release/
-          cp up-gsap-animate.php release/
-          cp readme.txt release/
-          cp LICENSE release/
-          cp README.md release/
-
-      - name: Create ZIP archive
-        run: |
-          cd release
-          zip -r ../up-gsap-animate.zip .
-
-      - name: Upload to release
-        uses: xresloader/upload-to-github-release@v1
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
+          # Create a clean directory for the plugin
+          mkdir up-gsap-animate
+          
+          # Copy only the necessary files
+          cp -r build up-gsap-animate/
+          cp -r src up-gsap-animate/
+          cp webpack.config.js up-gsap-animate/
+          cp *.php up-gsap-animate/
+          cp readme.txt up-gsap-animate/
+          cp LICENSE up-gsap-animate/
+          cp package.json up-gsap-animate/
+          cp README.md up-gsap-animate/
+          
+          # Create ZIP file
+          zip -r up-gsap-animate.zip up-gsap-animate
+          
+      - name: Upload Release Asset
+        uses: softprops/action-gh-release@v1
         with:
-          file: "up-gsap-animate.zip"
-          update_latest_release: true
-          draft: false
+          files: up-gsap-animate.zip
