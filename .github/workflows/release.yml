@@ -7,8 +7,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
 
     steps:
       - uses: actions/checkout@v3
@@ -41,8 +39,11 @@ jobs:
           cd release
           zip -r ../up-gsap-animate.zip .
 
-      - uses: ncipollo/release-action@v1
+      - name: Upload to release
+        uses: xresloader/upload-to-github-release@v1
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         with:
-          artifacts: "up-gsap-animate.zip"
-          allowUpdates: true
-          token: ${{ secrets.GITHUB_TOKEN }}
+          file: "up-gsap-animate.zip"
+          update_latest_release: true
+          draft: false
