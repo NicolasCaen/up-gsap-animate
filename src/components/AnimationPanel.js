@@ -10,6 +10,9 @@ import {
     FlexItem
 } from '@wordpress/components';
 
+// Récupérer les animations depuis PHP
+const { animations: phpAnimations = {}, easings: phpEasings = [] } = window.upGsapAnimateSettings || {};
+
 export const AnimationPanel = ({ attributes, setAttributes }) => {
     const { gsapAnimation, trigger } = attributes;
 
@@ -31,7 +34,7 @@ export const AnimationPanel = ({ attributes, setAttributes }) => {
         });
     };
 
-    // Animations prédéfinies
+    // Fusionner les animations prédéfinies avec celles de PHP
     const presetAnimations = {
         fade: {
             label: __('Fade', 'up-gsap-animate'),
@@ -87,8 +90,24 @@ export const AnimationPanel = ({ attributes, setAttributes }) => {
             label: __('Custom', 'up-gsap-animate'),
             from: {},
             to: {}
-        }
+        },
+        ...phpAnimations
     };
+
+    // Fusionner les easings prédéfinis avec ceux de PHP
+    const easingOptions = [
+        { label: 'Power1.out', value: 'power1.out' },
+        { label: 'Power2.out', value: 'power2.out' },
+        { label: 'Power3.out', value: 'power3.out' },
+        { label: 'Power4.out', value: 'power4.out' },
+        { label: 'Back.out', value: 'back.out' },
+        { label: 'Elastic.out', value: 'elastic.out' },
+        { label: 'Bounce.out', value: 'bounce.out' },
+        { label: 'Circ.out', value: 'circ.out' },
+        { label: 'Expo.out', value: 'expo.out' },
+        { label: 'Sine.out', value: 'sine.out' },
+        ...phpEasings
+    ];
 
     return (
         <PanelBody title={__('Animation Settings', 'up-gsap-animate')} initialOpen={false}>
@@ -137,18 +156,7 @@ export const AnimationPanel = ({ attributes, setAttributes }) => {
                     <SelectControl
                         label={__('Easing', 'up-gsap-animate')}
                         value={gsapAnimation.ease}
-                        options={[
-                            { label: 'Power1.out', value: 'power1.out' },
-                            { label: 'Power2.out', value: 'power2.out' },
-                            { label: 'Power3.out', value: 'power3.out' },
-                            { label: 'Power4.out', value: 'power4.out' },
-                            { label: 'Back.out', value: 'back.out' },
-                            { label: 'Elastic.out', value: 'elastic.out' },
-                            { label: 'Bounce.out', value: 'bounce.out' },
-                            { label: 'Circ.out', value: 'circ.out' },
-                            { label: 'Expo.out', value: 'expo.out' },
-                            { label: 'Sine.out', value: 'sine.out' }
-                        ]}
+                        options={easingOptions}
                         onChange={(ease) => updateAnimation('ease', ease)}
                     />
 

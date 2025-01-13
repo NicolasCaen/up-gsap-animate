@@ -17,18 +17,43 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit; // Exit if accessed directly.
 }
 
+// Define plugin constants
+define('UP_GSAP_ANIMATE_VERSION', '1.0.0');
+define('UP_GSAP_ANIMATE_PLUGIN_DIR', plugin_dir_path(__FILE__));
+define('UP_GSAP_ANIMATE_PLUGIN_URL', plugin_dir_url(__FILE__));
+
+// Include required files
+require_once UP_GSAP_ANIMATE_PLUGIN_DIR . 'includes/hooks.php';
+
+/**
+ * Initialize the plugin
+ */
+function up_gsap_animate_init() {
+    // Enqueue scripts and styles
+    add_action('enqueue_block_editor_assets', 'up_gsap_animate_editor_assets');
+    add_action('wp_enqueue_scripts', 'up_gsap_animate_frontend_assets');
+}
+add_action('init', 'up_gsap_animate_init');
+
 /**
  * Enqueue editor assets
  */
 function up_gsap_animate_editor_assets() {
+    $asset_file = include(UP_GSAP_ANIMATE_PLUGIN_DIR . 'build/index.asset.php');
+
     wp_enqueue_script(
         'up-gsap-animate-editor',
-        plugins_url( 'build/index.js', __FILE__ ),
-        array( 'wp-blocks', 'wp-dom-ready', 'wp-edit-post' ),
-        filemtime( plugin_dir_path( __FILE__ ) . 'build/index.js' )
+        UP_GSAP_ANIMATE_PLUGIN_URL . 'build/index.js',
+        $asset_file['dependencies'],
+        $asset_file['version']
     );
+
+    // Pass animations and easings to JavaScript
+    wp_localize_script('up-gsap-animate-editor', 'upGsapAnimateSettings', [
+        'animations' => up_gsap_get_animations(),
+        'easings' => up_gsap_get_easings()
+    ]);
 }
-add_action( 'enqueue_block_editor_assets', 'up_gsap_animate_editor_assets' );
 
 /**
  * Enqueue frontend assets
@@ -61,7 +86,6 @@ function up_gsap_animate_frontend_assets() {
         true
     );
 }
-add_action( 'wp_enqueue_scripts', 'up_gsap_animate_frontend_assets' );
 
 /**
  * Add animation data to block HTML

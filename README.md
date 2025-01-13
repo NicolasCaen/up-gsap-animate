@@ -133,6 +133,88 @@ Si vous rencontrez des erreurs lors de l'installation ou de la compilation :
    npm run build
    ```
 
+## Utilisation des Hooks pour les Animations Personnalisées
+
+Vous pouvez étendre les fonctionnalités du plugin en ajoutant vos propres animations personnalisées en utilisant les hooks WordPress.
+
+### Ajouter des Animations Personnalisées
+
+Utilisez le hook `up_gsap_animations` pour ajouter vos propres animations :
+
+```php
+add_filter('up_gsap_animations', function($animations) {
+    // Ajoutez une animation personnalisée
+    $animations['maAnimation'] = [
+        'label' => __('Ma Animation Personnalisée', 'votre-textdomain'),
+        'from' => [
+            'x' => -200,
+            'y' => 100,
+            'rotation' => 45,
+            'opacity' => 0
+        ],
+        'to' => [
+            'x' => 0,
+            'y' => 0,
+            'rotation' => 0,
+            'opacity' => 1,
+            'ease' => 'bounce.out'
+        ]
+    ];
+    
+    return $animations;
+});
+```
+
+### Ajouter des Fonctions d'Assouplissement Personnalisées
+
+Utilisez le hook `up_gsap_easings` pour ajouter des fonctions d'assouplissement personnalisées :
+
+```php
+add_filter('up_gsap_easings', function($easings) {
+    $easings[] = [
+        'label' => 'Assouplissement Personnalisé',
+        'value' => 'personnalise.assouplissement'
+    ];
+    
+    return $easings;
+});
+```
+
+### Modifier les Paramètres d'Animation
+
+Utilisez le hook `up_gsap_animation_settings` pour modifier les paramètres d'animation pour des blocs spécifiques :
+
+```php
+add_filter('up_gsap_animation_settings', function($settings, $block_id) {
+    // Modifiez les paramètres pour un bloc spécifique
+    if ($block_id === 'votre-id-bloc') {
+        $settings['duration'] = 2;
+        $settings['ease'] = 'bounce.out';
+    }
+    
+    return $settings;
+}, 10, 2);
+```
+
+### Propriétés Disponibles
+
+Lorsque vous créez des animations personnalisées, vous pouvez utiliser ces propriétés GSAP :
+
+#### Propriétés de Transformation
+- `x`: Position horizontale
+- `y`: Position verticale
+- `rotation`: Rotation en degrés
+- `scale`: Facteur d'échelle (1 = taille normale)
+- `scaleX`: Échelle horizontale
+- `scaleY`: Échelle verticale
+
+#### Opacité
+- `opacity`: Valeur entre 0 (transparent) et 1 (opaque)
+
+#### Autres
+- `ease`: Fonction d'assouplissement (par exemple, 'power2.out', 'bounce.out')
+- `duration`: Durée de l'animation en secondes
+
 ## Contribution
 
 Les contributions sont les bienvenues ! N'hésitez pas à soumettre une Pull Request.
