@@ -63,6 +63,21 @@ const addAnimationAttributes = (settings) => {
                 pin: false,
                 markers: false
             }
+        },
+        timeline: {
+            type: 'object',
+            default: {
+                isTimelineParent: false,
+                timelineId: '',
+                timelineParentId: '',
+                position: '+=0',
+                stagger: 0.2,
+                globalDuration: 1,
+                defaults: {
+                    ease: 'power2.out',
+                    duration: 1
+                }
+            }
         }
     };
     return settings;
@@ -72,8 +87,34 @@ const addAnimationAttributes = (settings) => {
 const PluginAnimationSidebar = () => {
     // Récupérer le bloc sélectionné
     const selectedBlock = useSelect((select) => {
-        const { getSelectedBlock } = select(blockEditorStore);
-        return getSelectedBlock();
+        const { getSelectedBlock, getBlocks } = select(blockEditorStore);
+        const currentBlock = getSelectedBlock();
+        const allBlocks = getBlocks();
+
+        // Si le bloc sélectionné est un parent de timeline, récupérer ses enfants
+        if (currentBlock?.attributes?.timeline?.isTimelineParent) {
+            const timelineId = currentBlock.attributes.timeline.timelineId;
+            const timelineChildren = allBlocks.filter(block => 
+                block.attributes?.timeline?.timelineParentId === timelineId
+            );
+            return {
+                currentBlock,
+                timelineChildren
+            };
+        }
+
+        // Si le bloc sélectionné est un enfant de timeline, récupérer son parent
+        if (currentBlock?.attributes?.timeline?.timelineParentId) {
+            const parentBlock = allBlocks.find(block => 
+                block.attributes?.timeline?.timelineId === currentBlock.attributes.timeline.timelineParentId
+            );
+            return {
+                currentBlock,
+                timelineParent: parentBlock
+            };
+        }
+
+        return { currentBlock };
     }, []);
 
     // Récupérer la fonction pour mettre à jour les attributs du bloc
@@ -81,8 +122,8 @@ const PluginAnimationSidebar = () => {
 
     // Fonction pour mettre à jour les attributs
     const setAttributes = (attributes) => {
-        if (selectedBlock) {
-            updateBlockAttributes(selectedBlock.clientId, attributes);
+        if (selectedBlock.currentBlock) {
+            updateBlockAttributes(selectedBlock.currentBlock.clientId, attributes);
         }
     };
 
@@ -98,11 +139,16 @@ const PluginAnimationSidebar = () => {
                 title={__('Animation Settings', 'up-gsap-animate')}
                 icon={<Icon icon={animationIcon} />}
             >
-                {selectedBlock ? (
+                {selectedBlock.currentBlock ? (
                     <div className="up-gsap-animate-sidebar-content">
                         <AnimationPanel
-                            attributes={selectedBlock.attributes}
+                            attributes={selectedBlock.currentBlock.attributes}
                             setAttributes={setAttributes}
+                            timelineInfo={{
+                                isTimelineParent: selectedBlock.currentBlock.attributes?.timeline?.isTimelineParent,
+                                timelineChildren: selectedBlock.timelineChildren,
+                                timelineParent: selectedBlock.timelineParent
+                            }}
                         />
                     </div>
                 ) : (
