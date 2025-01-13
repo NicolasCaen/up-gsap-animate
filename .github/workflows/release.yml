@@ -34,11 +34,9 @@ jobs:
           
           # Copy only the necessary files
           cp -r build up-gsap-animate/
-          cp webpack.config.js up-gsap-animate/
           cp *.php up-gsap-animate/
           cp readme.txt up-gsap-animate/
           cp LICENSE up-gsap-animate/
-          cp package.json up-gsap-animate/
           cp README.md up-gsap-animate/
           
           # Create ZIP file
