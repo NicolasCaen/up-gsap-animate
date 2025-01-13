@@ -34,7 +34,6 @@ jobs:
           
           # Copy only the necessary files
           cp -r build up-gsap-animate/
-          cp -r src up-gsap-animate/
           cp webpack.config.js up-gsap-animate/
           cp *.php up-gsap-animate/
           cp readme.txt up-gsap-animate/
