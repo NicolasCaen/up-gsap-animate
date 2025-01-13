@@ -5,7 +5,6 @@ import { addFilter } from '@wordpress/hooks';
 import { createHigherOrderComponent } from '@wordpress/compose';
 import { Fragment } from '@wordpress/element';
 import { InspectorControls } from '@wordpress/block-editor';
-import { ToggleControl } from '@wordpress/components';
 import { __ } from '@wordpress/i18n';
 
 /**
@@ -13,10 +12,19 @@ import { __ } from '@wordpress/i18n';
  */
 import { AnimationPanel } from './components/AnimationPanel';
 
+// Fonction pour générer un ID unique
+const generateUniqueId = () => {
+    return 'gsap-' + Math.random().toString(36).substr(2, 9) + '-' + Date.now();
+};
+
 // Add animation attributes to all blocks
 const addAnimationAttributes = (settings) => {
     settings.attributes = {
         ...settings.attributes,
+        id: {
+            type: 'string',
+            default: generateUniqueId()
+        },
         gsapAnimation: {
             type: 'object',
             default: {
@@ -37,12 +45,11 @@ const addAnimationAttributes = (settings) => {
                 scrubType: 'none',
                 smoothness: 1,
                 pin: false,
-                markers: false,
-                reverse: true,
-                customTrigger: ''
+                markers: false
             }
         }
     };
+
     return settings;
 };
 
@@ -50,44 +57,25 @@ const addAnimationAttributes = (settings) => {
 const withAnimationControls = createHigherOrderComponent((BlockEdit) => {
     return (props) => {
         const { attributes, setAttributes } = props;
-        const { 
-            gsapAnimation = { 
-                enabled: false, 
-                type: 'fade', 
-                duration: 1, 
-                ease: 'power2.out',
-                from: { opacity: 0 },
-                to: { opacity: 1 }
-            }
-        } = attributes;
+
+        // S'assurer qu'un ID unique est défini
+        if (!attributes.id) {
+            setAttributes({ id: generateUniqueId() });
+        }
 
         return (
             <Fragment>
                 <BlockEdit {...props} />
                 <InspectorControls>
-                    <div className="gsap-animation-controls">
-                        <AnimationPanel
-                            attributes={attributes}
-                            setAttributes={setAttributes}
-                        />
-                    </div>
+                    <AnimationPanel
+                        attributes={attributes}
+                        setAttributes={setAttributes}
+                    />
                 </InspectorControls>
             </Fragment>
         );
     };
 }, 'withAnimationControls');
-
-// Add animation data to saved content
-const addAnimationData = (extraProps, blockType, attributes) => {
-    const { gsapAnimation, trigger } = attributes;
-
-    if (gsapAnimation && gsapAnimation.enabled) {
-        extraProps['data-gsap-animation'] = JSON.stringify(gsapAnimation);
-        extraProps['data-gsap-trigger'] = JSON.stringify(trigger);
-    }
-
-    return extraProps;
-};
 
 // Add the animation attributes to all blocks
 addFilter(
@@ -101,11 +89,4 @@ addFilter(
     'editor.BlockEdit',
     'up-gsap-animate/with-animation-controls',
     withAnimationControls
-);
-
-// Add the animation data to the saved content
-addFilter(
-    'blocks.getSaveContent.extraProps',
-    'up-gsap-animate/add-animation-data',
-    addAnimationData
 );
