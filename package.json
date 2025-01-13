@@ -1,6 +1,6 @@
 {
 	"name": "up-gsap-animate",
-	"version": "0.1.2",
+	"version": "0.2.0",
 	"description": "Add GSAP animations to your WordPress blocks",
 	"author": "GEHIN Nicolas",
 	"license": "GPL-2.0-or-later",

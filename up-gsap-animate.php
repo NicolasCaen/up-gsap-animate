@@ -2,7 +2,7 @@
 /**
  * Plugin Name: UP GSAP Animate
  * Description: Add GSAP animations to your blocks
- * Version: 0.1.2
+ * Version: 0.2.0
  * Author: GEHIN Nicolas
  * License: GPL2
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
