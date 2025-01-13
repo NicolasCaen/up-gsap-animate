@@ -5,13 +5,13 @@ import { addFilter } from '@wordpress/hooks';
 import { createHigherOrderComponent } from '@wordpress/compose';
 import { Fragment } from '@wordpress/element';
 import { InspectorControls } from '@wordpress/block-editor';
-import {
-    PanelBody,
-    SelectControl,
-    ToggleControl,
-    RangeControl
-} from '@wordpress/components';
+import { ToggleControl } from '@wordpress/components';
 import { __ } from '@wordpress/i18n';
+
+/**
+ * Internal dependencies
+ */
+import { AnimationPanel } from './components/AnimationPanel';
 
 // Add animation attributes to all blocks
 const addAnimationAttributes = (settings) => {
@@ -23,7 +23,23 @@ const addAnimationAttributes = (settings) => {
                 enabled: false,
                 type: 'fade',
                 duration: 1,
-                ease: 'power2.out'
+                ease: 'power2.out',
+                from: { opacity: 0 },
+                to: { opacity: 1 }
+            }
+        },
+        trigger: {
+            type: 'object',
+            default: {
+                type: 'scroll',
+                start: 'top center',
+                end: '',
+                scrubType: 'none',
+                smoothness: 1,
+                pin: false,
+                markers: false,
+                reverse: true,
+                customTrigger: ''
             }
         }
     };
@@ -34,60 +50,27 @@ const addAnimationAttributes = (settings) => {
 const withAnimationControls = createHigherOrderComponent((BlockEdit) => {
     return (props) => {
         const { attributes, setAttributes } = props;
-        const { gsapAnimation = { enabled: false, type: 'fade', duration: 1, ease: 'power2.out' } } = attributes;
-
-        // Update animation settings
-        const updateAnimation = (updates) => {
-            setAttributes({
-                gsapAnimation: {
-                    ...gsapAnimation,
-                    ...updates
-                }
-            });
-        };
+        const { 
+            gsapAnimation = { 
+                enabled: false, 
+                type: 'fade', 
+                duration: 1, 
+                ease: 'power2.out',
+                from: { opacity: 0 },
+                to: { opacity: 1 }
+            }
+        } = attributes;
 
         return (
             <Fragment>
                 <BlockEdit {...props} />
                 <InspectorControls>
-                    <PanelBody
-                        title={__('Animation Settings', 'up-gsap-animate')}
-                        initialOpen={false}
-                    >
-                        <ToggleControl
-                            label={__('Enable Animation', 'up-gsap-animate')}
-                            checked={gsapAnimation.enabled}
-                            onChange={(enabled) => updateAnimation({ enabled })}
-                            __nextHasNoMarginBottom
+                    <div className="gsap-animation-controls">
+                        <AnimationPanel
+                            attributes={attributes}
+                            setAttributes={setAttributes}
                         />
-
-                        {gsapAnimation.enabled && (
-                            <>
-                                <SelectControl
-                                    label={__('Animation Type', 'up-gsap-animate')}
-                                    value={gsapAnimation.type}
-                                    options={[
-                                        { label: __('Fade', 'up-gsap-animate'), value: 'fade' },
-                                        { label: __('Slide', 'up-gsap-animate'), value: 'slide' },
-                                        { label: __('Scale', 'up-gsap-animate'), value: 'scale' },
-                                        { label: __('Rotate', 'up-gsap-animate'), value: 'rotate' }
-                                    ]}
-                                    onChange={(type) => updateAnimation({ type })}
-                                    __nextHasNoMarginBottom
-                                />
-
-                                <RangeControl
-                                    label={__('Duration (seconds)', 'up-gsap-animate')}
-                                    value={gsapAnimation.duration}
-                                    onChange={(duration) => updateAnimation({ duration })}
-                                    min={0.1}
-                                    max={5}
-                                    step={0.1}
-                                    __nextHasNoMarginBottom
-                                />
-                            </>
-                        )}
-                    </PanelBody>
+                    </div>
                 </InspectorControls>
             </Fragment>
         );
@@ -96,14 +79,11 @@ const withAnimationControls = createHigherOrderComponent((BlockEdit) => {
 
 // Add animation data to saved content
 const addAnimationData = (extraProps, blockType, attributes) => {
-    const { gsapAnimation } = attributes;
+    const { gsapAnimation, trigger } = attributes;
 
     if (gsapAnimation && gsapAnimation.enabled) {
-        return {
-            ...extraProps,
-            'data-gsap-animation': JSON.stringify(gsapAnimation),
-            'className': `${extraProps.className || ''} has-gsap-animation`
-        };
+        extraProps['data-gsap-animation'] = JSON.stringify(gsapAnimation);
+        extraProps['data-gsap-trigger'] = JSON.stringify(trigger);
     }
 
     return extraProps;
@@ -116,14 +96,14 @@ addFilter(
     addAnimationAttributes
 );
 
-// Add the inspector control to all blocks
+// Add the animation controls to all blocks
 addFilter(
     'editor.BlockEdit',
-    'up-gsap-animate/with-inspector-control',
+    'up-gsap-animate/with-animation-controls',
     withAnimationControls
 );
 
-// Add animation data to saved content
+// Add the animation data to the saved content
 addFilter(
     'blocks.getSaveContent.extraProps',
     'up-gsap-animate/add-animation-data',

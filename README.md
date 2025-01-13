@@ -12,6 +12,32 @@ Un plugin WordPress qui ajoute des animations GSAP à n'importe quel bloc dans l
 - Animations responsives
 - Performances optimisées
 
+## Options de Déclenchement
+
+Le plugin offre plusieurs options pour déclencher les animations :
+
+### Types de Déclenchement
+
+1. **Scroll** - Déclenche l'animation au défilement
+   - Start Position : Position de début (ex: "top center", "50% 75%")
+   - End Position : Position de fin (optionnel)
+   - Scrub Type :
+     - None : Animation normale
+     - True : Animation liée au défilement
+     - Smooth : Animation fluide avec contrôle de la fluidité
+   - Pin Element : Fixe l'élément pendant l'animation
+   - Show Markers : Affiche les marqueurs de débogage
+
+2. **Load** - Déclenche l'animation au chargement de la page
+
+3. **Click** - Déclenche l'animation au clic
+
+4. **Hover** - Déclenche l'animation au survol
+   - Reverse on Leave : Inverse l'animation quand la souris quitte l'élément
+
+5. **Custom** - Déclenchement personnalisé
+   - Custom Trigger : Sélecteur CSS ou ID d'élément personnalisé
+
 ## Installation
 
 1. Téléchargez les fichiers du plugin dans le répertoire `/wp-content/plugins/up-gsap-animate`

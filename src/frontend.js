@@ -7,58 +7,83 @@ document.addEventListener('DOMContentLoaded', () => {
 
     animatedElements.forEach(element => {
         try {
-            // Parse animation data
+            // Parse animation and trigger data
             const animationData = JSON.parse(element.dataset.gsapAnimation);
+            const triggerData = JSON.parse(element.dataset.gsapTrigger || '{}');
             
             if (!animationData || !animationData.enabled) return;
 
-            const { type, duration, ease } = animationData;
+            const { type, duration, ease, from, to } = animationData;
 
             // Set initial state
-            switch (type) {
-                case 'fade':
-                    gsap.set(element, { opacity: 0 });
-                    break;
-                case 'slide':
-                    gsap.set(element, { x: -100, opacity: 0 });
-                    break;
-                case 'scale':
-                    gsap.set(element, { scale: 0, opacity: 0 });
-                    break;
-                case 'rotate':
-                    gsap.set(element, { rotation: -180, opacity: 0 });
-                    break;
-            }
+            gsap.set(element, from);
 
-            // Create animation
-            let animation;
-            switch (type) {
-                case 'fade':
-                    animation = { opacity: 1 };
-                    break;
-                case 'slide':
-                    animation = { x: 0, opacity: 1 };
-                    break;
-                case 'scale':
-                    animation = { scale: 1, opacity: 1 };
-                    break;
-                case 'rotate':
-                    animation = { rotation: 0, opacity: 1 };
-                    break;
-            }
-
-            // Add ScrollTrigger
-            gsap.to(element, {
-                ...animation,
+            // Create animation configuration
+            const animationConfig = {
+                ...to,
                 duration,
-                ease,
-                scrollTrigger: {
-                    trigger: element,
-                    start: "top 80%", // Démarre quand le haut de l'élément atteint 80% de la hauteur de la fenêtre
-                    end: "bottom 20%",
-                    toggleActions: "play none none reverse" // play on enter, reverse on leave
-                }
-            });
+                ease
+            };
+
+            // Configure trigger based on type
+            switch (triggerData.type) {
+                case 'scroll':
+                    animationConfig.scrollTrigger = {
+                        trigger: element,
+                        start: triggerData.start || 'top 80%',
+                        end: triggerData.end || 'bottom 20%',
+                        scrub: triggerData.scrubType === 'none' ? false : 
+                               triggerData.scrubType === 'smooth' ? triggerData.smoothness : true,
+                        pin: triggerData.pin,
+                        markers: triggerData.markers,
+                        toggleActions: "play none none reverse"
+                    };
+                    gsap.to(element, animationConfig);
+                    break;
+
+                case 'load':
+                    gsap.to(element, animationConfig);
+                    break;
+
+                case 'click':
+                    element.addEventListener('click', () => {
+                        gsap.to(element, animationConfig);
+                    });
+                    break;
+
+                case 'hover':
+                    const hoverAnimation = gsap.to(element, animationConfig);
+                    hoverAnimation.pause();
+
+                    element.addEventListener('mouseenter', () => {
+                        hoverAnimation.play();
+                    });
+
+                    if (triggerData.reverse) {
+                        element.addEventListener('mouseleave', () => {
+                            hoverAnimation.reverse();
+                        });
+                    }
+                    break;
+
+                case 'custom':
+                    if (triggerData.customTrigger) {
+                        const customTrigger = document.querySelector(triggerData.customTrigger);
+                        if (customTrigger) {
+                            animationConfig.scrollTrigger = {
+                                trigger: customTrigger,
+                                start: triggerData.start || 'top 80%',
+                                end: triggerData.end || 'bottom 20%',
+                                scrub: triggerData.scrubType === 'none' ? false : 
+                                       triggerData.scrubType === 'smooth' ? triggerData.smoothness : true,
+                                markers: triggerData.markers,
+                                toggleActions: "play none none reverse"
+                            };
+                            gsap.to(element, animationConfig);
+                        }
+                    }
+                    break;
+            }
 
         } catch (error) {
             console.error('Error initializing animation:', error);
