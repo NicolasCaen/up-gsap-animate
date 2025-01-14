@@ -231,8 +231,8 @@ class UP_GSAP_Animate {
         error_log('Timelines: ' . print_r($this->timelines, true));
 
         // Générer le code JS
-        $generator = new UP_GSAP_JS_Generator($this->animations, $this->timelines);
-        $js_code = $generator->generate();
+        $generator = new UP_GSAP_JS_Generator($blocks);
+        $js_code = $generator->generate_js();
         
         // Debug
         error_log('Generated JS: ' . $js_code);
