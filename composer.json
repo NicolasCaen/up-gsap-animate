@@ -1,0 +1,19 @@
+{
+    "name": "up/gsap-animate",
+    "description": "WordPress plugin for GSAP animations",
+    "type": "wordpress-plugin",
+    "require-dev": {
+        "phpunit/phpunit": "^10.5",
+        "yoast/phpunit-polyfills": "^2.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "UP_GSAP\\": "includes/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "UP_GSAP\\Tests\\": "tests/"
+        }
+    }
+}

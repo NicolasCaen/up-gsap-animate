@@ -9,6 +9,27 @@ class UP_GSAP_JS_Generator {
         $this->timelines = $timelines;
     }
 
+    private function escape_js($string) {
+        if (function_exists('esc_js')) {
+            return esc_js($string);
+        }
+        
+        // Version simplifiée de esc_js pour les tests
+        $string = strtr($string, array(
+            "\r" => '',
+            "\n" => '\\n',
+            "\t" => '\\t',
+            "'" => "\\'",
+            '"' => '\\"',
+            '\\' => '\\\\',
+            '</' => '<\/',
+            "\xe2\x80\xa8" => '\\u2028',
+            "\xe2\x80\xa9" => '\\u2029'
+        ));
+        
+        return preg_replace('/[^a-zA-Z0-9,._]/u', '\\\\$0', $string);
+    }
+
     public function generate() {
         $js = "/* GSAP Animations */\n\n";
         
@@ -55,7 +76,7 @@ class UP_GSAP_JS_Generator {
         
         // État initial
         if (!empty($timeline_data['animation']['from'])) {
-            $js .= "        gsap.set('#" . esc_js($timeline_data['anchor']) . "', {\n";
+            $js .= "        gsap.set('#" . $this->escape_js($timeline_data['anchor']) . "', {\n";
             $js .= "            " . $this->format_animation_props($timeline_data['animation']['from']) . "\n";
             $js .= "        });\n\n";
         }
@@ -68,10 +89,10 @@ class UP_GSAP_JS_Generator {
         $js .= "        });\n\n";
 
         // Animation
-        $js .= "        " . $timeline_var . ".to('#" . esc_js($timeline_data['anchor']) . "', {\n";
+        $js .= "        " . $timeline_var . ".to('#" . $this->escape_js($timeline_data['anchor']) . "', {\n";
         $js .= "            " . $this->format_animation_props($timeline_data['animation']['to']) . "\n";
         $js .= "            duration: " . floatval($timeline_data['animation']['duration']) . ",\n";
-        $js .= "            ease: '" . esc_js($timeline_data['animation']['ease']) . "'\n";
+        $js .= "            ease: '" . $this->escape_js($timeline_data['animation']['ease']) . "'\n";
         $js .= "        });\n\n";
 
         return $js;
@@ -86,16 +107,16 @@ class UP_GSAP_JS_Generator {
         
         // État initial
         if (!empty($animation_data['animation']['from'])) {
-            $js .= "        gsap.set('#" . esc_js($animation_data['anchor']) . "', {\n";
+            $js .= "        gsap.set('#" . $this->escape_js($animation_data['anchor']) . "', {\n";
             $js .= "            " . $this->format_animation_props($animation_data['animation']['from']) . "\n";
             $js .= "        });\n\n";
         }
 
         // Animation
-        $js .= "        gsap.to('#" . esc_js($animation_data['anchor']) . "', {\n";
+        $js .= "        gsap.to('#" . $this->escape_js($animation_data['anchor']) . "', {\n";
         $js .= "            " . $this->format_animation_props($animation_data['animation']['to']) . "\n";
         $js .= "            duration: " . floatval($animation_data['animation']['duration']) . ",\n";
-        $js .= "            ease: '" . esc_js($animation_data['animation']['ease']) . "'";
+        $js .= "            ease: '" . $this->escape_js($animation_data['animation']['ease']) . "'";
 
         if (!empty($animation_data['trigger'])) {
             $js .= ",\n            " . $this->generate_trigger($animation_data['trigger']);
@@ -112,10 +133,10 @@ class UP_GSAP_JS_Generator {
         switch ($trigger['type']) {
             case 'scroll':
                 $js .= "scrollTrigger: {\n";
-                $js .= "                trigger: '#" . esc_js($trigger['element_id']) . "',\n";
-                $js .= "                start: '" . esc_js($trigger['start']) . "',\n";
+                $js .= "                trigger: '#" . $this->escape_js($trigger['element_id']) . "',\n";
+                $js .= "                start: '" . $this->escape_js($trigger['start']) . "',\n";
                 if (!empty($trigger['end'])) {
-                    $js .= "                end: '" . esc_js($trigger['end']) . "',\n";
+                    $js .= "                end: '" . $this->escape_js($trigger['end']) . "',\n";
                 }
                 if (!empty($trigger['scrub'])) {
                     $js .= "                scrub: " . $this->get_scrub_value($trigger) . ",\n";
@@ -132,15 +153,15 @@ class UP_GSAP_JS_Generator {
             case 'hover':
                 $js .= "paused: true,\n";
                 $js .= "            onComplete: function() {\n";
-                $js .= "                document.querySelector('#" . esc_js($trigger['element_id']) . "').addEventListener('mouseenter', () => this.play());\n";
-                $js .= "                document.querySelector('#" . esc_js($trigger['element_id']) . "').addEventListener('mouseleave', () => this.reverse());\n";
+                $js .= "                document.querySelector('#" . $this->escape_js($trigger['element_id']) . "').addEventListener('mouseenter', () => this.play());\n";
+                $js .= "                document.querySelector('#" . $this->escape_js($trigger['element_id']) . "').addEventListener('mouseleave', () => this.reverse());\n";
                 $js .= "            }";
                 break;
 
             case 'click':
                 $js .= "paused: true,\n";
                 $js .= "            onComplete: function() {\n";
-                $js .= "                document.querySelector('#" . esc_js($trigger['element_id']) . "').addEventListener('click', () => this.restart());\n";
+                $js .= "                document.querySelector('#" . $this->escape_js($trigger['element_id']) . "').addEventListener('click', () => this.restart());\n";
                 $js .= "            }";
                 break;
         }
@@ -178,7 +199,7 @@ class UP_GSAP_JS_Generator {
             if (is_numeric($value)) {
                 $formatted[] = $key . ": " . $value;
             } else {
-                $formatted[] = $key . ": '" . esc_js($value) . "'";
+                $formatted[] = $key . ": '" . $this->escape_js($value) . "'";
             }
         }
         return implode(",\n            ", $formatted);

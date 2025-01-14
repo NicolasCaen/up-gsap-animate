@@ -25,9 +25,70 @@ class UP_GSAP_Animate {
         $this->admin = new UP_GSAP_Admin();
         
         // Actions WordPress
-        add_action('init', array($this, 'register_block_attributes'));
+        add_action('init', array($this, 'init'));
+        add_action('wp_enqueue_scripts', array($this, 'enqueue_frontend_assets'));
+        add_action('enqueue_block_editor_assets', array($this, 'enqueue_editor_assets'));
         add_action('wp_footer', array($this, 'output_animations'));
         add_action('save_post', array($this, 'maybe_generate_animation_file'), 10, 3);
+    }
+
+    public function init() {
+        $this->register_block_attributes();
+        
+        wp_register_script(
+            'up-gsap-animate-editor',
+            plugins_url('build/index.js', __FILE__),
+            array('wp-blocks', 'wp-element', 'wp-editor', 'wp-components', 'wp-i18n', 'wp-data')
+        );
+    }
+
+    public function enqueue_frontend_assets() {
+        wp_enqueue_script(
+            'gsap',
+            'https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js',
+            array(),
+            '3.12.2',
+            true
+        );
+
+        wp_enqueue_script(
+            'gsap-scroll-trigger',
+            'https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js',
+            array('gsap'),
+            '3.12.2',
+            true
+        );
+
+        // Charger le fichier d'animation spécifique à la page si disponible
+        if (is_singular()) {
+            $post_id = get_the_ID();
+            $theme_dir = get_stylesheet_directory();
+            $gsap_dir = $theme_dir . '/assets/js/gsap';
+            $file_path = $gsap_dir . '/page-' . $post_id . '.js';
+            
+            if (file_exists($file_path)) {
+                wp_enqueue_script(
+                    'gsap-animations-' . $post_id,
+                    get_stylesheet_directory_uri() . '/assets/js/gsap/page-' . $post_id . '.js',
+                    array('gsap', 'gsap-scroll-trigger'),
+                    filemtime($file_path),
+                    true
+                );
+            }
+        }
+    }
+
+    public function enqueue_editor_assets() {
+        wp_enqueue_script('up-gsap-animate-editor');
+        
+        wp_add_inline_script(
+            'up-gsap-animate-editor',
+            'window.upGsapAnimateSettings = ' . json_encode(array(
+                'animations' => apply_filters('up_gsap_animate_animations', array()),
+                'easings' => apply_filters('up_gsap_animate_easings', array())
+            )),
+            'before'
+        );
     }
 
     public function register_block_attributes() {
@@ -53,7 +114,7 @@ class UP_GSAP_Animate {
     }
 
     public function collect_animations($content, $block) {
-        if (empty($block['attrs']['gsapAnimation'])) {
+        if (empty($block['attrs']['gsapAnimation']) || empty($block['attrs']['gsapAnimation']['enabled'])) {
             return;
         }
 
@@ -68,23 +129,39 @@ class UP_GSAP_Animate {
         
         // Ajouter à la timeline ou comme animation standalone
         if (!empty($animation_data['timeline'])) {
-            if (!isset($this->timelines[$animation_data['timeline']])) {
-                $this->timelines[$animation_data['timeline']] = array(
+            $timeline_id = $animation_data['timeline'];
+            if (!isset($this->timelines[$timeline_id])) {
+                $this->timelines[$timeline_id] = array(
                     'anchor' => $element_id,
-                    'animation' => $animation_data,
+                    'animation' => array(
+                        'from' => $animation_data['from'] ?? array(),
+                        'to' => $animation_data['to'] ?? array(),
+                        'duration' => $animation_data['duration'] ?? 1,
+                        'ease' => $animation_data['ease'] ?? 'power2.out'
+                    ),
                     'trigger' => $animation_data['trigger'] ?? null
                 );
             }
         } else {
             $this->animations[] = array(
                 'anchor' => $element_id,
-                'animation' => $animation_data,
+                'animation' => array(
+                    'from' => $animation_data['from'] ?? array(),
+                    'to' => $animation_data['to'] ?? array(),
+                    'duration' => $animation_data['duration'] ?? 1,
+                    'ease' => $animation_data['ease'] ?? 'power2.out'
+                ),
                 'trigger' => $animation_data['trigger'] ?? null
             );
         }
     }
 
     public function output_animations() {
+        // Ne pas générer le script inline si on utilise des fichiers JS
+        if (!empty($this->admin->get_option('generate_js_files'))) {
+            return;
+        }
+
         if (empty($this->animations) && empty($this->timelines)) {
             return;
         }
@@ -118,6 +195,10 @@ class UP_GSAP_Animate {
         if (!file_exists($gsap_dir)) {
             wp_mkdir_p($gsap_dir);
         }
+
+        // Réinitialiser les animations et timelines
+        $this->animations = array();
+        $this->timelines = array();
 
         // Collecter les animations
         $blocks = parse_blocks($content);
