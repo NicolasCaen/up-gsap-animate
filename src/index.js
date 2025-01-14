@@ -93,30 +93,60 @@ const PluginAnimationSidebar = () => {
         const currentBlock = getSelectedBlock();
         const allBlocks = getBlocks();
 
+        // Debug log
+        console.log('Current Block:', currentBlock?.attributes?.timeline);
+
+        // Trouver tous les blocs parents de timeline disponibles
+        const availableParents = allBlocks.filter(block => 
+            block.attributes?.timeline?.isTimelineParent && 
+            block !== currentBlock
+        ).map(block => ({
+            timelineId: block.attributes.timeline.timelineId,
+            name: block.attributes.timeline.name || `Timeline ${block.attributes.timeline.timelineId}`,
+            blockName: block.name && block.name.replace('core/', '').replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())
+        }));
+
+        let timelineChildren = [];
+        let timelineParent = null;
+
         // Si le bloc sélectionné est un parent de timeline, récupérer ses enfants
-        if (currentBlock?.attributes?.timeline?.isTimelineParent) {
+        if (currentBlock?.attributes?.timeline?.isTimelineParent && currentBlock?.attributes?.timeline?.timelineId) {
             const timelineId = currentBlock.attributes.timeline.timelineId;
-            const timelineChildren = allBlocks.filter(block => 
+            timelineChildren = allBlocks.filter(block => 
                 block.attributes?.timeline?.timelineParentId === timelineId
             );
-            return {
-                currentBlock,
-                timelineChildren
-            };
+            console.log('Timeline Parent - ID:', timelineId);
+            console.log('Timeline Parent - Children:', timelineChildren);
         }
 
         // Si le bloc sélectionné est un enfant de timeline, récupérer son parent
         if (currentBlock?.attributes?.timeline?.timelineParentId) {
-            const parentBlock = allBlocks.find(block => 
-                block.attributes?.timeline?.timelineId === currentBlock.attributes.timeline.timelineParentId
+            const parentTimelineId = currentBlock.attributes.timeline.timelineParentId;
+            timelineParent = allBlocks.find(block => 
+                block.attributes?.timeline?.timelineId === parentTimelineId
             );
-            return {
-                currentBlock,
-                timelineParent: parentBlock
-            };
+            // Get siblings (other children of the same parent)
+            if (timelineParent) {
+                timelineChildren = allBlocks.filter(block => 
+                    block.attributes?.timeline?.timelineParentId === parentTimelineId &&
+                    block.clientId !== currentBlock.clientId
+                );
+                console.log('Timeline Child - Parent ID:', parentTimelineId);
+                console.log('Timeline Child - Parent:', timelineParent);
+                console.log('Timeline Child - Siblings:', timelineChildren);
+            }
         }
 
-        return { currentBlock };
+        // Debug final values
+        console.log('Final timelineChildren:', timelineChildren?.length);
+        console.log('Final timelineParent:', timelineParent?.attributes?.timeline?.timelineId);
+
+        return { 
+            currentBlock, 
+            timelineChildren,
+            timelineParent,
+            availableParents 
+        };
     }, []);
 
     // Récupérer la fonction pour mettre à jour les attributs du bloc
@@ -149,7 +179,8 @@ const PluginAnimationSidebar = () => {
                             timelineInfo={{
                                 isTimelineParent: selectedBlock.currentBlock.attributes?.timeline?.isTimelineParent,
                                 timelineChildren: selectedBlock.timelineChildren,
-                                timelineParent: selectedBlock.timelineParent
+                                timelineParent: selectedBlock.timelineParent,
+                                availableParents: selectedBlock.availableParents
                             }}
                         />
                     </div>

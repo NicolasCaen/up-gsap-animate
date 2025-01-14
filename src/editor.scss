@@ -82,6 +82,38 @@
         &:last-child {
             margin-bottom: 0;
         }
+
+        // Style pour le sélecteur de timeline parent
+        &.components-select-control {
+            .components-input-control__container {
+                .components-select-control__input {
+                    option:disabled {
+                        font-weight: bold;
+                        color: #1e1e1e;
+                        background-color: #f0f0f0;
+                    }
+                }
+            }
+        }
+    }
+
+    // Style pour la prévisualisation de la timeline
+    .up-gsap-timeline-preview {
+        margin-top: 16px;
+        padding: 12px;
+        background-color: #f0f0f0;
+        border-radius: 4px;
+
+        .up-gsap-timeline-info {
+            margin: 0 0 8px 0;
+            font-weight: 500;
+        }
+
+        .up-gsap-timeline-children {
+            margin: 0;
+            color: #757575;
+            font-size: 12px;
+        }
     }
 
     .components-textarea-control__input {

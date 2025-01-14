@@ -105,7 +105,8 @@ class UP_GSAP_Animate {
     public function collect_animations_from_blocks($blocks) {
         foreach ($blocks as $block) {
             if (!empty($block['attrs'])) {
-                $this->collect_animations($block['innerHTML'], $block);
+                error_log('Processing block: ' . print_r($block['blockName'], true));
+                $this->collect_animations($block);
             }
             if (!empty($block['innerBlocks'])) {
                 $this->collect_animations_from_blocks($block['innerBlocks']);
@@ -113,46 +114,62 @@ class UP_GSAP_Animate {
         }
     }
 
-    public function collect_animations($content, $block) {
+    public function collect_animations($block) {
+        error_log('Checking block attributes: ' . print_r($block['attrs'], true));
+        
         if (empty($block['attrs']['gsapAnimation']) || empty($block['attrs']['gsapAnimation']['enabled'])) {
+            error_log('Block skipped: no animation or not enabled');
             return;
         }
 
         $animation_data = $block['attrs']['gsapAnimation'];
+        error_log('Animation data found: ' . print_r($animation_data, true));
         
-        // Vérifier si on a un ID
-        if (empty($block['attrs']['anchor'])) {
+        // Extraire l'ID du HTML
+        if (empty($block['innerHTML'])) {
+            error_log('Block skipped: no innerHTML');
             return;
         }
 
-        $element_id = $block['attrs']['anchor'];
+        // Utiliser une expression régulière pour extraire l'ID
+        if (!preg_match('/id="([^"]+)"/', $block['innerHTML'], $matches)) {
+            error_log('Block skipped: no ID found in HTML');
+            return;
+        }
+
+        $element_id = $matches[1];
+        error_log('Element ID found: ' . $element_id);
         
         // Ajouter à la timeline ou comme animation standalone
-        if (!empty($animation_data['timeline'])) {
-            $timeline_id = $animation_data['timeline'];
+        if (!empty($block['attrs']['timeline'])) {
+            $timeline_id = $block['attrs']['timeline']['timelineId'];
+            error_log('Adding to timeline: ' . $timeline_id);
             if (!isset($this->timelines[$timeline_id])) {
                 $this->timelines[$timeline_id] = array(
                     'anchor' => $element_id,
                     'animation' => array(
-                        'from' => $animation_data['from'] ?? array(),
-                        'to' => $animation_data['to'] ?? array(),
-                        'duration' => $animation_data['duration'] ?? 1,
-                        'ease' => $animation_data['ease'] ?? 'power2.out'
+                        'from' => isset($animation_data['from']) ? $animation_data['from'] : array(),
+                        'to' => isset($animation_data['to']) ? $animation_data['to'] : array(),
+                        'duration' => isset($animation_data['duration']) ? $animation_data['duration'] : 1,
+                        'ease' => isset($animation_data['ease']) ? $animation_data['ease'] : 'power2.out'
                     ),
-                    'trigger' => $animation_data['trigger'] ?? null
+                    'trigger' => isset($animation_data['trigger']) ? $animation_data['trigger'] : null
                 );
+                error_log('Timeline created: ' . print_r($this->timelines[$timeline_id], true));
             }
         } else {
+            error_log('Adding standalone animation');
             $this->animations[] = array(
                 'anchor' => $element_id,
                 'animation' => array(
-                    'from' => $animation_data['from'] ?? array(),
-                    'to' => $animation_data['to'] ?? array(),
-                    'duration' => $animation_data['duration'] ?? 1,
-                    'ease' => $animation_data['ease'] ?? 'power2.out'
+                    'from' => isset($animation_data['from']) ? $animation_data['from'] : array(),
+                    'to' => isset($animation_data['to']) ? $animation_data['to'] : array(),
+                    'duration' => isset($animation_data['duration']) ? $animation_data['duration'] : 1,
+                    'ease' => isset($animation_data['ease']) ? $animation_data['ease'] : 'power2.out'
                 ),
-                'trigger' => $animation_data['trigger'] ?? null
+                'trigger' => isset($animation_data['trigger']) ? $animation_data['trigger'] : null
             );
+            error_log('Animation added: ' . print_r(end($this->animations), true));
         }
     }
 
@@ -202,11 +219,23 @@ class UP_GSAP_Animate {
 
         // Collecter les animations
         $blocks = parse_blocks($content);
+        
+        // Debug
+        error_log('Content: ' . $content);
+        error_log('Blocks: ' . print_r($blocks, true));
+        
         $this->collect_animations_from_blocks($blocks);
+        
+        // Debug
+        error_log('Animations: ' . print_r($this->animations, true));
+        error_log('Timelines: ' . print_r($this->timelines, true));
 
         // Générer le code JS
         $generator = new UP_GSAP_JS_Generator($this->animations, $this->timelines);
         $js_code = $generator->generate();
+        
+        // Debug
+        error_log('Generated JS: ' . $js_code);
 
         // Sauvegarder dans un fichier
         $file_path = $gsap_dir . '/page-' . $post_id . '.js';

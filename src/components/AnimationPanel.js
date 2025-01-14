@@ -15,7 +15,11 @@ const { animations: phpAnimations = {}, easings: phpEasings = [] } = window.upGs
 
 export const AnimationPanel = ({ attributes, setAttributes, timelineInfo }) => {
     const { gsapAnimation, trigger, timeline } = attributes;
-    const { isTimelineParent, timelineChildren, timelineParent } = timelineInfo || {};
+    const { isTimelineParent, timelineChildren, timelineParent, availableParents } = timelineInfo || {};
+
+    // Debug logs
+    console.log('AnimationPanel - timelineInfo:', timelineInfo);
+    console.log('AnimationPanel - timelineChildren:', timelineChildren);
 
     const updateGsapAnimation = (value) => {
         setAttributes({
@@ -98,139 +102,107 @@ export const AnimationPanel = ({ attributes, setAttributes, timelineInfo }) => {
         ...phpEasings
     ];
 
+    const animationTypes = [
+        { value: 'none', label: __('None', 'up-gsap-animate') },
+        { value: 'timeline-parent', label: __('Timeline Parent', 'up-gsap-animate') },
+        { value: 'timeline-child', label: __('Timeline Child', 'up-gsap-animate') },
+        { value: 'standalone', label: __('Standalone Animation', 'up-gsap-animate') }
+    ];
+
+    // Determine current animation type
+    const getCurrentType = () => {
+        if (!gsapAnimation.enabled) return 'none';
+        if (timeline.isTimelineParent) return 'timeline-parent';
+        if (timeline.timelineParentId) return 'timeline-child';
+        return 'standalone';
+    };
+
+    // Handle animation type change
+    const handleTypeChange = (type) => {
+        const newTimeline = { ...timeline };
+        
+        // Reset timeline settings
+        newTimeline.isTimelineParent = false;
+        newTimeline.timelineParentId = '';
+        newTimeline.position = '';
+        newTimeline.timelineId = '';
+        
+        // Set new type-specific settings
+        if (type === 'timeline-parent') {
+            newTimeline.isTimelineParent = true;
+            newTimeline.timelineId = 'timeline-' + Math.random().toString(36).substr(2, 9);
+        } else if (type === 'timeline-child') {
+            // Si des parents sont disponibles, sélectionner le premier par défaut
+            if (availableParents?.length > 0) {
+                newTimeline.timelineParentId = availableParents[0].timelineId;
+            }
+        }
+
+        // Update gsapAnimation enabled state and reset animation if needed
+        if (type === 'none') {
+            updateGsapAnimation({ enabled: false });
+        } else {
+            // Activer l'animation si elle ne l'est pas déjà
+            if (!gsapAnimation.enabled) {
+                updateGsapAnimation({ 
+                    enabled: true,
+                    type: 'fade',
+                    duration: 1,
+                    ease: 'power2.out',
+                    from: { opacity: 0 },
+                    to: { opacity: 1 }
+                });
+            }
+        }
+        
+        setAttributes({ timeline: newTimeline });
+    };
+
     return (
         <>
             <PanelBody
-                title={__('Timeline Settings', 'up-gsap-animate')}
+                title={__('Animation Type', 'up-gsap-animate')}
                 initialOpen={true}
-                className="up-gsap-timeline-section"
+                className="up-gsap-type-section"
             >
-                <ToggleControl
-                    label={__('Timeline Parent', 'up-gsap-animate')}
-                    help={__('Make this block a timeline parent', 'up-gsap-animate')}
-                    checked={timeline.isTimelineParent}
-                    onChange={(isTimelineParent) => updateTimeline({ isTimelineParent })}
+                <SelectControl
+                    label={__('Type', 'up-gsap-animate')}
+                    value={getCurrentType()}
+                    options={animationTypes}
+                    onChange={handleTypeChange}
                 />
-
-                {timeline.isTimelineParent && (
-                    <>
-                        <RangeControl
-                            label={__('Global Duration', 'up-gsap-animate')}
-                            value={timeline.globalDuration}
-                            onChange={(globalDuration) => updateTimeline({ globalDuration })}
-                            min={0.1}
-                            max={10}
-                            step={0.1}
-                        />
-                        <RangeControl
-                            label={__('Stagger', 'up-gsap-animate')}
-                            help={__('Delay between child animations', 'up-gsap-animate')}
-                            value={timeline.stagger}
-                            onChange={(stagger) => updateTimeline({ stagger })}
-                            min={0}
-                            max={2}
-                            step={0.1}
-                        />
-                        {timelineChildren && timelineChildren.length > 0 && (
-                            <Panel>
-                                <PanelBody title={__('Timeline Children', 'up-gsap-animate')} initialOpen={false}>
-                                    {timelineChildren.map((child, index) => (
-                                        <div key={child.clientId} className="timeline-child-item">
-                                            <strong>{__('Block', 'up-gsap-animate')} {index + 1}</strong>
-                                            <p>{child.name}</p>
-                                        </div>
-                                    ))}
-                                </PanelBody>
-                            </Panel>
-                        )}
-                    </>
+                
+                {getCurrentType() === 'timeline-parent' && (
+                    <TextControl
+                        label={__('Timeline Name', 'up-gsap-animate')}
+                        value={timeline.name || ''}
+                        onChange={(name) => updateTimeline({ name })}
+                        help={__('Give your timeline a descriptive name to easily identify it', 'up-gsap-animate')}
+                    />
                 )}
 
-                {!timeline.isTimelineParent && !timeline.timelineParentId && (
-                    <Button
-                        variant="secondary"
-                        onClick={() => {
-                            if (timelineParent) {
-                                updateTimeline({ timelineParentId: timelineParent.attributes.timeline.timelineId });
-                            }
-                        }}
-                        disabled={!timelineParent}
-                    >
-                        {__('Add to Timeline', 'up-gsap-animate')}
-                    </Button>
-                )}
-
-                {timeline.timelineParentId && (
-                    <>
-                        <TextControl
-                            label={__('Position in Timeline', 'up-gsap-animate')}
-                            help={__('Example: +=0.5, >, <', 'up-gsap-animate')}
-                            value={timeline.position}
-                            onChange={(position) => updateTimeline({ position })}
-                        />
-                        <Button
-                            variant="secondary"
-                            onClick={() => updateTimeline({ timelineParentId: '' })}
-                        >
-                            {__('Remove from Timeline', 'up-gsap-animate')}
-                        </Button>
-                    </>
-                )}
-            </PanelBody>
-
-            <PanelBody
-                title={__('Animation', 'up-gsap-animate')}
-                initialOpen={true}
-                className="up-gsap-animation-section"
-            >
-                <ToggleControl
-                    label={__('Enable Animation', 'up-gsap-animate')}
-                    checked={gsapAnimation.enabled}
-                    onChange={(enabled) => updateGsapAnimation({ enabled })}
-                />
-
-                {gsapAnimation.enabled && (
+                {getCurrentType() === 'timeline-child' && (
                     <>
                         <SelectControl
-                            label={__('Animation Type', 'up-gsap-animate')}
-                            value={gsapAnimation.type}
-                            options={Object.entries(presetAnimations).map(([value, { label }]) => ({
-                                label,
-                                value
-                            }))}
-                            onChange={(type) => {
-                                const preset = presetAnimations[type];
-                                updateGsapAnimation({
-                                    type,
-                                    from: preset.from,
-                                    to: preset.to
-                                });
-                            }}
-                        />
-
-                        <RangeControl
-                            label={__('Duration (seconds)', 'up-gsap-animate')}
-                            value={gsapAnimation.duration}
-                            onChange={(duration) => updateGsapAnimation({ duration })}
-                            min={0.1}
-                            max={10}
-                            step={0.1}
-                        />
-
-                        <SelectControl
-                            label={__('Easing', 'up-gsap-animate')}
-                            value={gsapAnimation.ease}
-                            options={easingOptions}
-                            onChange={(ease) => updateGsapAnimation({ ease })}
+                            label={__('Parent Timeline', 'up-gsap-animate')}
+                            value={timeline.timelineParentId}
+                            options={[
+                                { label: __('None', 'up-gsap-animate'), value: '' },
+                                ...availableParents.map(parent => ({
+                                    label: parent.name,
+                                    value: parent.timelineId
+                                }))
+                            ]}
+                            onChange={(timelineParentId) => updateTimeline({ timelineParentId })}
                         />
                     </>
                 )}
             </PanelBody>
 
-            {gsapAnimation.enabled && !timeline.timelineParentId && (
+            {(getCurrentType() === 'standalone' || getCurrentType() === 'timeline-parent') && (
                 <PanelBody
                     title={__('Trigger', 'up-gsap-animate')}
-                    initialOpen={false}
+                    initialOpen={true}
                     className="up-gsap-trigger-section"
                 >
                     <SelectControl
@@ -307,7 +279,101 @@ export const AnimationPanel = ({ attributes, setAttributes, timelineInfo }) => {
                 </PanelBody>
             )}
 
-            {gsapAnimation.enabled && gsapAnimation.type === 'custom' && (
+            {(getCurrentType() === 'timeline-parent' && (
+                <PanelBody
+                    title={__('Timeline Settings', 'up-gsap-animate')}
+                    initialOpen={true}
+                    className="up-gsap-timeline-section"
+                >
+                    <RangeControl
+                        label={__('Global Duration', 'up-gsap-animate')}
+                        value={timeline.globalDuration}
+                        onChange={(globalDuration) => updateTimeline({ globalDuration })}
+                        min={0.1}
+                        max={10}
+                        step={0.1}
+                    />
+                    <RangeControl
+                        label={__('Stagger', 'up-gsap-animate')}
+                        help={__('Delay between child animations', 'up-gsap-animate')}
+                        value={timeline.stagger}
+                        onChange={(stagger) => updateTimeline({ stagger })}
+                        min={0}
+                        max={2}
+                        step={0.1}
+                    />
+                    {timelineChildren && timelineChildren.length > 0 && (
+                        <Panel>
+                            <PanelBody title={__('Timeline Children', 'up-gsap-animate')} initialOpen={false}>
+                                {timelineChildren.map((child, index) => (
+                                    <div key={child.clientId} className="timeline-child-item">
+                                        <strong>{__('Block', 'up-gsap-animate')} {index + 1}</strong>
+                                        <p>{child.name}</p>
+                                    </div>
+                                ))}
+                            </PanelBody>
+                        </Panel>
+                    )}
+                </PanelBody>
+            ))}
+
+            {(getCurrentType() === 'standalone' || getCurrentType() === 'timeline-child') && (
+                <PanelBody
+                    title={__('Animation', 'up-gsap-animate')}
+                    initialOpen={true}
+                    className="up-gsap-animation-section"
+                >
+                    <SelectControl
+                        label={__('Animation Type', 'up-gsap-animate')}
+                        value={gsapAnimation.type}
+                        options={Object.entries(presetAnimations).map(([value, { label }]) => ({
+                            label,
+                            value
+                        }))}
+                        onChange={(type) => {
+                            const preset = presetAnimations[type];
+                            updateGsapAnimation({
+                                type,
+                                from: preset.from,
+                                to: preset.to
+                            });
+                        }}
+                    />
+
+                    <RangeControl
+                        label={__('Duration (seconds)', 'up-gsap-animate')}
+                        value={gsapAnimation.duration}
+                        onChange={(duration) => updateGsapAnimation({ duration })}
+                        min={0.1}
+                        max={10}
+                        step={0.1}
+                    />
+
+                    <SelectControl
+                        label={__('Easing', 'up-gsap-animate')}
+                        value={gsapAnimation.ease}
+                        options={easingOptions}
+                        onChange={(ease) => updateGsapAnimation({ ease })}
+                    />
+                </PanelBody>
+            )}
+
+            {(getCurrentType() === 'timeline-child') && (
+                <PanelBody
+                    title={__('Timeline Position', 'up-gsap-animate')}
+                    initialOpen={true}
+                    className="up-gsap-timeline-position-section"
+                >
+                    <TextControl
+                        label={__('Position in Timeline', 'up-gsap-animate')}
+                        help={__('Example: +=0.5, >, <', 'up-gsap-animate')}
+                        value={timeline.position}
+                        onChange={(position) => updateTimeline({ position })}
+                    />
+                </PanelBody>
+            )}
+
+            {(getCurrentType() !== 'none' && gsapAnimation.type === 'custom') && (
                 <PanelBody
                     title={__('Advanced Settings', 'up-gsap-animate')}
                     initialOpen={false}
