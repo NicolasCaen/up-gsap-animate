@@ -19,7 +19,7 @@ import { AnimationPanel } from './components/AnimationPanel';
 
 // Fonction pour générer un ID unique
 const generateUniqueId = () => {
-    return 'gsap-' + Math.random().toString(36).substr(2, 9) + '-' + Date.now();
+    return 'a' + Math.random().toString(36).substring(2, 7);
 };
 
 // Icône d'animation
@@ -35,12 +35,14 @@ const animationIcon = (
 
 // Add animation attributes to all blocks
 const addAnimationAttributes = (settings) => {
+    // Make sure we have the anchor support
+    if (!settings.supports) {
+        settings.supports = {};
+    }
+    settings.supports.anchor = true;
+
     settings.attributes = {
         ...settings.attributes,
-        id: {
-            type: 'string',
-            default: generateUniqueId()
-        },
         gsapAnimation: {
             type: 'object',
             default: {
@@ -160,6 +162,26 @@ const PluginAnimationSidebar = () => {
         </Fragment>
     );
 };
+
+// Wrap block edit to add animation controls
+const withAnimationControls = createHigherOrderComponent((BlockEdit) => {
+    return (props) => {
+        const { attributes, setAttributes } = props;
+        const { gsapAnimation } = attributes;
+
+        // Si l'animation est activée et qu'il n'y a pas d'ancre, en générer une
+        React.useEffect(() => {
+            if (gsapAnimation?.enabled && !attributes.anchor) {
+                setAttributes({ anchor: generateUniqueId() });
+            }
+        }, [gsapAnimation?.enabled]);
+
+        return <BlockEdit {...props} />;
+    };
+}, 'withAnimationControls');
+
+// Add animation controls to all blocks
+addFilter('editor.BlockEdit', 'up-gsap-animate/with-animation-controls', withAnimationControls);
 
 // Enregistrer le plugin
 registerPlugin('up-gsap-animate', {
