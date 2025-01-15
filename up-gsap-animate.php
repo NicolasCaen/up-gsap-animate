@@ -11,18 +11,17 @@ if (!defined('ABSPATH')) {
 }
 
 class UP_GSAP_Animate {
-    private $animations = array();
-    private $timelines = array();
     private $admin;
     private $js_generator;
 
     public function __construct() {
         // Charger les dépendances
-        require_once plugin_dir_path(__FILE__) . 'includes/class-js-generator.php';
+        require_once plugin_dir_path(__FILE__) . 'includes/class-simple-gsap-generator.php';
         require_once plugin_dir_path(__FILE__) . 'includes/class-admin.php';
 
         // Initialiser les composants
         $this->admin = new UP_GSAP_Admin();
+        $this->js_generator = new GSAP_Animation_Generator();
         
         // Actions WordPress
         add_action('init', array($this, 'init'));
@@ -40,6 +39,22 @@ class UP_GSAP_Animate {
             plugins_url('build/index.js', __FILE__),
             array('wp-blocks', 'wp-element', 'wp-editor', 'wp-components', 'wp-i18n', 'wp-data')
         );
+    }
+
+    public function register_block_attributes() {
+        $registered_blocks = WP_Block_Type_Registry::get_instance()->get_all_registered();
+        
+        foreach ($registered_blocks as $block_name => $block_type) {
+            $block_type->attributes['gsapAnimation'] = array(
+                'type' => 'object',
+                'default' => null
+            );
+            
+            $block_type->attributes['timeline'] = array(
+                'type' => 'object',
+                'default' => null
+            );
+        }
     }
 
     public function enqueue_frontend_assets() {
@@ -91,137 +106,45 @@ class UP_GSAP_Animate {
         );
     }
 
-    public function register_block_attributes() {
-        $registered_blocks = WP_Block_Type_Registry::get_instance()->get_all_registered();
-        
-        foreach ($registered_blocks as $block_name => $block_type) {
-            $block_type->attributes['gsapAnimation'] = array(
-                'type' => 'object',
-                'default' => null
-            );
-        }
-    }
-
-    public function collect_animations_from_blocks($blocks) {
-        foreach ($blocks as $block) {
-            if (!empty($block['attrs'])) {
-                error_log('Processing block: ' . print_r($block['blockName'], true));
-                $this->collect_animations($block);
-            }
-            if (!empty($block['innerBlocks'])) {
-                $this->collect_animations_from_blocks($block['innerBlocks']);
-            }
-        }
-    }
-
-    public function collect_animations($block) {
-        error_log('Checking block attributes: ' . print_r($block['attrs'], true));
-        
-        if (empty($block['attrs']['gsapAnimation']['enabled'])) {
-            error_log('Block skipped: no animation or not enabled');
-            return;
-        }
-
-        $animation_data = $block['attrs']['gsapAnimation'];
-        error_log('Animation data found: ' . print_r($animation_data, true));
-        
-        // Extraire l'ID du HTML
-        if (empty($block['innerHTML'])) {
-            error_log('Block skipped: no innerHTML');
-            return;
-        }
-
-        // Utiliser une expression régulière pour extraire l'ID
-        if (!preg_match('/id="([^"]+)"/', $block['innerHTML'], $matches)) {
-            error_log('Block skipped: no ID found in HTML');
-            return;
-        }
-
-        $element_id = $matches[1];
-        error_log('Element ID found: ' . $element_id);
-        
-        // Ajouter à la timeline ou comme animation standalone
-        if (!empty($block['attrs']['timeline']['isTimelineParent'])) {
-            error_log('Adding timeline parent');
-            $timeline_id = $element_id;
-            $this->timelines[$timeline_id] = array(
-                'anchor' => $element_id,
-                'animation' => array(
-                    'type' => isset($animation_data['animationType']) ? $animation_data['animationType'] : 'from',
-                    'from' => isset($animation_data['from']) ? $animation_data['from'] : array(),
-                    'duration' => isset($animation_data['duration']) ? $animation_data['duration'] : 1,
-                    'ease' => isset($animation_data['ease']) ? $animation_data['ease'] : 'power2.out'
-                ),
-                'trigger' => isset($block['attrs']['trigger']) ? $block['attrs']['trigger'] : null,
-                'options' => array(
-                    'defaults' => isset($block['attrs']['timeline']['defaults']) ? $block['attrs']['timeline']['defaults'] : null,
-                    'stagger' => isset($block['attrs']['timeline']['stagger']) ? $block['attrs']['timeline']['stagger'] : null
-                ),
-                'children' => array()
-            );
-        } else if (!empty($block['attrs']['timeline']['timelineParentId'])) {
-            error_log('Adding timeline child');
-            $parent_id = $block['attrs']['timeline']['timelineParentId'];
-            $animation = array(
-                'anchor' => $element_id,
-                'animation' => array(
-                    'type' => isset($animation_data['animationType']) ? $animation_data['animationType'] : 'from',
-                    'from' => isset($animation_data['from']) ? $animation_data['from'] : array(),
-                    'duration' => isset($animation_data['duration']) ? $animation_data['duration'] : 1,
-                    'ease' => isset($animation_data['ease']) ? $animation_data['ease'] : 'power2.out'
-                ),
-                'position' => isset($block['attrs']['timeline']['position']) ? $block['attrs']['timeline']['position'] : null
-            );
-            
-            if (!isset($this->timelines[$parent_id]['children'])) {
-                $this->timelines[$parent_id]['children'] = array();
-            }
-            $this->timelines[$parent_id]['children'][] = $animation;
-        } else {
-            error_log('Adding standalone animation');
-            $this->animations[] = array(
-                'anchor' => $element_id,
-                'animation' => array(
-                    'type' => isset($animation_data['animationType']) ? $animation_data['animationType'] : 'from',
-                    'from' => isset($animation_data['from']) ? $animation_data['from'] : array(),
-                    'duration' => isset($animation_data['duration']) ? $animation_data['duration'] : 1,
-                    'ease' => isset($animation_data['ease']) ? $animation_data['ease'] : 'power2.out'
-                ),
-                'trigger' => isset($block['attrs']['trigger']) ? $block['attrs']['trigger'] : null
-            );
-        }
-    }
-
     public function output_animations() {
-        // Ne pas générer le script inline si on utilise des fichiers JS
-        if (!empty($this->admin->get_option('generate_js_files'))) {
+        $post_id = get_the_ID();
+        if (!$post_id) {
             return;
         }
 
-        if (empty($this->animations) && empty($this->timelines)) {
+        $content = get_post_field('post_content', $post_id, 'raw');
+
+        if (empty($content)) {
             return;
         }
 
-        $generator = new UP_GSAP_JS_Generator($this->animations, $this->timelines);
-        $script = $generator->generate();
-
-        echo '<script>' . $script . '</script>';
+        $script = $this->js_generator->generate_animations($content);
+        if ($script) {
+            echo '<script>' . $script . '</script>';
+        }
     }
 
     public function maybe_generate_animation_file($post_id, $post, $update) {
-        // Vérifier si on doit générer les fichiers JS
-        if (empty($this->admin->get_option('generate_js_files'))) {
+        if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) {
             return;
         }
 
-        // Vérifier si c'est une révision ou un auto-save
-        if (wp_is_post_revision($post_id) || (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE)) {
+        if (!current_user_can('edit_post', $post_id)) {
             return;
         }
 
-        // Vérifier si le contenu a des animations
-        $content = $post->post_content;
-        if (strpos($content, 'gsapAnimation') === false) {
+        $content = get_post_field('post_content', $post_id, 'raw');
+        if (empty($content)) {
+            return;
+        }
+
+       //error_log("=== POST Content  ROW===");
+       //error_log($content);
+       //error_log("=== POST Content  ROW ===");
+
+        // Générer le code JS
+        $js_code = $this->js_generator->generate_animations($content);
+        if (!$js_code) {
             return;
         }
 
@@ -231,30 +154,6 @@ class UP_GSAP_Animate {
         if (!file_exists($gsap_dir)) {
             wp_mkdir_p($gsap_dir);
         }
-
-        // Réinitialiser les animations et timelines
-        $this->animations = array();
-        $this->timelines = array();
-
-        // Collecter les animations
-        $blocks = parse_blocks($content);
-        
-        // Debug
-        error_log('Content: ' . $content);
-        error_log('Blocks: ' . print_r($blocks, true));
-        
-        $this->collect_animations_from_blocks($blocks);
-        
-        // Debug
-        error_log('Animations: ' . print_r($this->animations, true));
-        error_log('Timelines: ' . print_r($this->timelines, true));
-
-        // Générer le code JS
-        $generator = new UP_GSAP_JS_Generator($this->animations, $this->timelines);
-        $js_code = $generator->generate();
-        
-        // Debug
-        error_log('Generated JS: ' . $js_code);
 
         // Sauvegarder dans un fichier
         $file_path = $gsap_dir . '/page-' . $post_id . '.js';
