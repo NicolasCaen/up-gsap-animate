@@ -53,11 +53,14 @@ class GSAP_Animation_Generator {
                 continue;
             }
             
-            $blocks[] = [
+            $block = [
                 'gsapAnimation' => $config['gsapAnimation'],
                 'timeline' => $config['timeline'] ?? [],
-                'elementId' => $elementId
+                'elementId' => $elementId,
+                'trigger' => $config['trigger'] ?? null
             ];
+            
+            $blocks[] = $block;
         }
         
         error_log("=== Extracted Animations ===");
@@ -127,44 +130,27 @@ class GSAP_Animation_Generator {
                     'id' => $timelineId,
                     'name' => $block['timeline']['name'] ?? '',
                     'defaults' => $block['timeline']['defaults'] ?? null,
-                    'scrollTrigger' => $block['gsapAnimation']['trigger'] ?? [
+                    'scrollTrigger' => isset($block['trigger']) ? [
+                        'trigger' => "#{$block['elementId']}",
+                        'start' => $block['trigger']['start'] ?? 'top center',
+                        'end' => !empty($block['trigger']['end']) ? $block['trigger']['end'] : null,
+                        'scrub' => isset($block['trigger']['scrubType']) && $block['trigger']['scrubType'] !== 'none',
+                        'markers' => $block['trigger']['markers'] ?? false,
+                        'pin' => $block['trigger']['pin'] ?? false
+                    ] : [
                         'trigger' => "#{$block['elementId']}",
                         'start' => 'top center'
                     ],
                     'animations' => []
                 ];
+
+                // Nettoyer les valeurs null du scrollTrigger
+                $structure['timelines'][$timelineId]['scrollTrigger'] = array_filter(
+                    $structure['timelines'][$timelineId]['scrollTrigger'],
+                    function($value) { return $value !== null; }
+                );
             } elseif ($block['gsapAnimation']['role'] === 'standalone') {
-                $animation = [
-                    'elementId' => $block['elementId']
-                ];
-
-                // Gestion des animations 'from' et 'fromTo'
-                if (isset($block['gsapAnimation']['animation'])) {
-                    $animation['type'] = 'from';
-                    $animation['from'] = $block['gsapAnimation']['animation']['from'];
-                    $animation['to'] = null;
-                    $animation['duration'] = $block['gsapAnimation']['animation']['duration'] ?? null;
-                    $animation['ease'] = $block['gsapAnimation']['animation']['ease'] ?? null;
-                } else {
-                    $animation['type'] = 'fromTo';
-                    $animation['from'] = $block['gsapAnimation']['from'];
-                    $animation['to'] = $block['gsapAnimation']['to'];
-                    $animation['duration'] = $block['gsapAnimation']['duration'] ?? null;
-                    $animation['ease'] = $block['gsapAnimation']['ease'] ?? null;
-                }
-
-                // Ajout du scrollTrigger s'il existe
-                if (isset($block['gsapAnimation']['trigger'])) {
-                    $animation['scrollTrigger'] = [
-                        'trigger' => "\"#{$animation['elementId']}\"",
-                        'start' => $block['gsapAnimation']['trigger']['start'] ?? 'top center',
-                        'end' => $block['gsapAnimation']['trigger']['end'] ?? null,
-                        'scrub' => $block['gsapAnimation']['trigger']['scrubType'] === 'none' ? false : true,
-                        'pin' => $block['gsapAnimation']['trigger']['pin'] ?? false,
-                        'markers' => $block['gsapAnimation']['trigger']['markers'] ?? false
-                    ];
-                }
-
+                $animation = $this->create_standalone_animation($block);
                 $structure['standaloneAnimations'][] = $animation;
             }
         }
@@ -174,24 +160,19 @@ class GSAP_Animation_Generator {
             if ($block['gsapAnimation']['role'] === 'timeline-child') {
                 $parentId = $block['timeline']['timelineParentId'];
                 
-                // Rechercher le bon timeline parent
                 foreach ($structure['timelines'] as $timelineId => $timeline) {
-                    // Vérifier si l'ID de la timeline correspond à l'ID du parent
-                    // ou si l'elementId du parent correspond
                     if ($timelineId === $parentId || $timeline['id'] === $parentId) {
-                        // S'assurer que le tableau animations existe
                         if (!isset($structure['timelines'][$timelineId]['animations'])) {
                             $structure['timelines'][$timelineId]['animations'] = [];
                         }
 
-                        // Ajouter la nouvelle animation au tableau
                         $structure['timelines'][$timelineId]['animations'][] = [
                             'elementId' => $block['elementId'],
                             'from' => $block['gsapAnimation']['from'],
                             'to' => $block['gsapAnimation']['to'],
-                            'duration' => $block['gsapAnimation']['duration'] ?? null,
-                            'ease' => $block['gsapAnimation']['ease'] ?? null,
-                            'position' => $block['timeline']['position'] ?? null
+                            'duration' => $block['gsapAnimation']['duration'],
+                            'ease' => $block['gsapAnimation']['ease'],
+                            'position' => $block['timeline']['position'] ?? '+=0'
                         ];
                         break;
                     }
@@ -209,6 +190,37 @@ class GSAP_Animation_Generator {
         }
 
         return $structure;
+    }
+
+    private function create_standalone_animation($block) {
+        $animation = [
+            'elementId' => $block['elementId'],
+            'type' => 'fromTo',
+            'from' => $block['gsapAnimation']['from'],
+            'to' => $block['gsapAnimation']['to'],
+            'duration' => $block['gsapAnimation']['duration'],
+            'ease' => $block['gsapAnimation']['ease']
+        ];
+
+        // Ajouter le scrollTrigger s'il existe
+        if (isset($block['trigger'])) {
+            $animation['scrollTrigger'] = [
+                'trigger' => "#{$block['elementId']}",
+                'start' => $block['trigger']['start'] ?? 'top center',
+                'end' => !empty($block['trigger']['end']) ? $block['trigger']['end'] : null,
+                'scrub' => isset($block['trigger']['scrubType']) && $block['trigger']['scrubType'] !== 'none',
+                'markers' => $block['trigger']['markers'] ?? false,
+                'pin' => $block['trigger']['pin'] ?? false
+            ];
+
+            // Nettoyer les valeurs null du scrollTrigger
+            $animation['scrollTrigger'] = array_filter(
+                $animation['scrollTrigger'],
+                function($value) { return $value !== null; }
+            );
+        }
+
+        return $animation;
     }
 
     /**
