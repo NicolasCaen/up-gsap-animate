@@ -247,7 +247,7 @@ class GSAP_Animation_Generator {
         ];
     }
 
-    private function handle_trigger_js($timeline_id, $trigger) {
+    private function handle_trigger_js($timeline_id, $trigger, $animation_var = null) {
         if (empty($trigger) || empty($trigger['type'])) {
             return '';
         }
@@ -255,24 +255,30 @@ class GSAP_Animation_Generator {
         $js = '';
         switch ($trigger['type']) {
             case 'hover':
-                $js .= "    {$timeline_id}.eventCallback(\"onEnter\", function() {\n";
-                $js .= "        {$timeline_id}.play();\n";
+                $var_name = $animation_var ?? $timeline_id;
+                $js .= "    document.querySelector('#{$timeline_id}').addEventListener('mouseenter', function() {\n";
+                $js .= "        " . $var_name . ".play();\n";
                 $js .= "    });\n";
-                $js .= "    {$timeline_id}.eventCallback(\"onLeave\", function() {\n";
+                $js .= "    document.querySelector('#{$timeline_id}').addEventListener('mouseleave', function() {\n";
                 if (!empty($trigger['reverse'])) {
-                    $js .= "        {$timeline_id}.reverse();\n";
+                    $js .= "        " . $var_name . ".reverse();\n";
                 } else {
-                    $js .= "        {$timeline_id}.pause();\n";
+                    $js .= "        " . $var_name . ".pause();\n";
                 }
                 $js .= "    });\n";
                 break;
 
             case 'click':
+                $var_name = $animation_var ?? $timeline_id;
                 $js .= "    document.querySelector('#{$timeline_id}').addEventListener('click', function() {\n";
                 if (!empty($trigger['reverse'])) {
-                    $js .= "        {$timeline_id}.reversed() ? {$timeline_id}.play() : {$timeline_id}.reverse();\n";
+                    $js .= "        if (" . $var_name . ".reversed()) {\n";
+                    $js .= "            " . $var_name . ".play();\n";
+                    $js .= "        } else {\n";
+                    $js .= "            " . $var_name . ".reverse();\n";
+                    $js .= "        }\n";
                 } else {
-                    $js .= "        {$timeline_id}.play();\n";
+                    $js .= "        " . $var_name . ".play();\n";
                 }
                 $js .= "    });\n";
                 break;
@@ -357,7 +363,7 @@ class GSAP_Animation_Generator {
 
                 // Gestion des triggers non-scroll
                 if (!empty($timeline['trigger']) && $timeline['trigger']['type'] !== 'scroll') {
-                    $js .= $this->handle_trigger_js($timeline['id'], $timeline['trigger']);
+                    $js .= $this->handle_trigger_js($timeline['id'], $timeline['trigger'], $timeline['id']);
                 }
             }
         }
@@ -390,18 +396,8 @@ class GSAP_Animation_Generator {
                 $js .= "    );\n\n";
 
                 // Gestion des triggers non-scroll pour les animations standalone
-                if (!empty($animation['trigger'])) {
-                    if ($animation['trigger']['type'] === 'click') {
-                        $js .= "    document.querySelector('#" . $animation['elementId'] . "').addEventListener('click', function() {\n";
-                        $js .= "        if (" . $animation_var . ".reversed()) {\n";
-                        $js .= "            " . $animation_var . ".play();\n";
-                        $js .= "        } else {\n";
-                        $js .= "            " . $animation_var . ".reverse();\n";
-                        $js .= "        }\n";
-                        $js .= "    });\n";
-                    } elseif ($animation['trigger']['type'] !== 'scroll') {
-                        $js .= $this->handle_trigger_js($animation['elementId'], $animation['trigger']);
-                    }
+                if (!empty($animation['trigger']) && $animation['trigger']['type'] !== 'scroll') {
+                    $js .= $this->handle_trigger_js($animation['elementId'], $animation['trigger'], $animation_var);
                 }
             }
         }
