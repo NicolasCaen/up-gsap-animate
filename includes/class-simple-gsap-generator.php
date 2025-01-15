@@ -102,15 +102,42 @@ class GSAP_Animation_Generator {
      * Sauvegarde la structure JSON dans un fichier temporaire
      */
     private function save_json_structure($json, $post_id) {
-        // Créer le dossier temp s'il n'existe pas
-        $temp_dir = WP_CONTENT_DIR . '/temp';
-        if (!file_exists($temp_dir)) {
-            mkdir($temp_dir, 0755, true);
-        }
+        try {
+            // Créer le dossier temp s'il n'existe pas
+            $temp_dir = WP_CONTENT_DIR . '/temp';
+            if (!file_exists($temp_dir)) {
+                if (!mkdir($temp_dir, 0755, true)) {
+                    error_log("Erreur lors de la création du dossier temp: " . $temp_dir);
+                    return false;
+                }
+            }
 
-        // Sauvegarder la structure dans un fichier JSON
-        $file_path = $temp_dir . '/structure-' . $post_id . '.json';
-        file_put_contents($file_path, json_encode($json, JSON_PRETTY_PRINT));
+            // Vérifier les permissions du dossier
+            if (!is_writable($temp_dir)) {
+                error_log("Le dossier temp n'est pas accessible en écriture: " . $temp_dir);
+                return false;
+            }
+
+            // Sauvegarder la structure dans un fichier JSON
+            $file_path = $temp_dir . '/structure-' . $post_id . '.json';
+            $json_content = json_encode($json, JSON_PRETTY_PRINT);
+            
+            if ($json_content === false) {
+                error_log("Erreur lors de l'encodage JSON: " . json_last_error_msg());
+                return false;
+            }
+
+            $result = file_put_contents($file_path, $json_content);
+            if ($result === false) {
+                error_log("Erreur lors de l'écriture du fichier: " . $file_path);
+                return false;
+            }
+
+            return true;
+        } catch (Exception $e) {
+            error_log("Exception lors de la sauvegarde de la structure JSON: " . $e->getMessage());
+            return false;
+        }
     }
 
     /**
@@ -122,188 +149,233 @@ class GSAP_Animation_Generator {
             'standaloneAnimations' => []
         ];
 
-        // Première passe : identifier les timelines et les animations standalone
         foreach ($blocks as $block) {
-            if ($block['gsapAnimation']['role'] === 'timeline-parent') {
-                $timelineId = $block['timeline']['timelineId'];
-                $structure['timelines'][$timelineId] = [
-                    'id' => $timelineId,
-                    'name' => $block['timeline']['name'] ?? '',
-                    'defaults' => $block['timeline']['defaults'] ?? null,
-                    'scrollTrigger' => isset($block['trigger']) ? [
-                        'trigger' => "#{$block['elementId']}",
-                        'start' => $block['trigger']['start'] ?? 'top center',
-                        'end' => !empty($block['trigger']['end']) ? $block['trigger']['end'] : null,
-                        'scrub' => isset($block['trigger']['scrubType']) && $block['trigger']['scrubType'] !== 'none',
-                        'markers' => $block['trigger']['markers'] ?? false,
-                        'pin' => $block['trigger']['pin'] ?? false
-                    ] : [
-                        'trigger' => "#{$block['elementId']}",
-                        'start' => 'top center'
-                    ],
+            $animation = $this->extract_animation_data($block);
+            
+            if ($animation['gsapAnimation']['role'] === 'timeline-parent') {
+                $timeline = [
+                    'id' => $animation['timeline']['timelineId'],
+                    'name' => $animation['timeline']['name'],
+                    'defaults' => $animation['timeline']['defaults'],
                     'animations' => []
                 ];
 
-                // Nettoyer les valeurs null du scrollTrigger
-                $structure['timelines'][$timelineId]['scrollTrigger'] = array_filter(
-                    $structure['timelines'][$timelineId]['scrollTrigger'],
-                    function($value) { return $value !== null; }
-                );
-            } elseif ($block['gsapAnimation']['role'] === 'standalone') {
-                $animation = $this->create_standalone_animation($block);
-                $structure['standaloneAnimations'][] = $animation;
+                // Gestion des différents types de triggers
+                if (!empty($animation['trigger'])) {
+                    $timeline['trigger'] = $this->handle_trigger($animation['trigger']);
+                }
+
+                $structure['timelines'][$animation['timeline']['timelineId']] = $timeline;
             }
-        }
-
-        // Deuxième passe : ajouter les animations aux timelines
-        foreach ($blocks as $block) {
-            if ($block['gsapAnimation']['role'] === 'timeline-child') {
-                $parentId = $block['timeline']['timelineParentId'];
-                
-                foreach ($structure['timelines'] as $timelineId => $timeline) {
-                    if ($timelineId === $parentId || $timeline['id'] === $parentId) {
-                        if (!isset($structure['timelines'][$timelineId]['animations'])) {
-                            $structure['timelines'][$timelineId]['animations'] = [];
-                        }
-
-                        $structure['timelines'][$timelineId]['animations'][] = [
-                            'elementId' => $block['elementId'],
-                            'from' => $block['gsapAnimation']['from'],
-                            'to' => $block['gsapAnimation']['to'],
-                            'duration' => $block['gsapAnimation']['duration'],
-                            'ease' => $block['gsapAnimation']['ease'],
-                            'position' => $block['timeline']['position'] ?? '+=0'
-                        ];
-                        break;
-                    }
+            elseif ($animation['gsapAnimation']['role'] === 'timeline-child') {
+                if (isset($structure['timelines'][$animation['timeline']['timelineParentId']])) {
+                    $structure['timelines'][$animation['timeline']['timelineParentId']]['animations'][] = [
+                        'elementId' => $animation['elementId'],
+                        'from' => $animation['gsapAnimation']['from'],
+                        'to' => $animation['gsapAnimation']['to'],
+                        'duration' => $animation['gsapAnimation']['duration'],
+                        'ease' => $animation['gsapAnimation']['ease'],
+                        'position' => $animation['timeline']['position']
+                    ];
                 }
             }
-        }
+            elseif ($animation['gsapAnimation']['role'] === 'standalone') {
+                $standalone = [
+                    'elementId' => $animation['elementId'],
+                    'type' => 'fromTo',
+                    'from' => $animation['gsapAnimation']['from'],
+                    'to' => $animation['gsapAnimation']['to'],
+                    'duration' => $animation['gsapAnimation']['duration'],
+                    'ease' => $animation['gsapAnimation']['ease']
+                ];
 
-        // Débogage de la structure JSON
-        $this->debug_json_structure_log($structure);
+                // Gestion des différents types de triggers pour les animations standalone
+                if (!empty($animation['trigger'])) {
+                    $standalone['trigger'] = $this->handle_trigger($animation['trigger']);
+                }
 
-        // Sauvegarder la structure dans un fichier temporaire
-        global $post;
-        if ($post) {
-            $this->save_json_structure($structure, $post->ID);
+                $structure['standaloneAnimations'][] = $standalone;
+            }
         }
 
         return $structure;
     }
 
-    private function create_standalone_animation($block) {
-        $animation = [
-            'elementId' => $block['elementId'],
-            'type' => 'fromTo',
-            'from' => $block['gsapAnimation']['from'],
-            'to' => $block['gsapAnimation']['to'],
-            'duration' => $block['gsapAnimation']['duration'],
-            'ease' => $block['gsapAnimation']['ease']
-        ];
-
-        // Ajouter le scrollTrigger s'il existe
-        if (isset($block['trigger'])) {
-            $animation['scrollTrigger'] = [
-                'trigger' => "#{$block['elementId']}",
-                'start' => $block['trigger']['start'] ?? 'top center',
-                'end' => !empty($block['trigger']['end']) ? $block['trigger']['end'] : null,
-                'scrub' => isset($block['trigger']['scrubType']) && $block['trigger']['scrubType'] !== 'none',
-                'markers' => $block['trigger']['markers'] ?? false,
-                'pin' => $block['trigger']['pin'] ?? false
-            ];
-
-            // Nettoyer les valeurs null du scrollTrigger
-            $animation['scrollTrigger'] = array_filter(
-                $animation['scrollTrigger'],
-                function($value) { return $value !== null; }
-            );
+    private function handle_trigger($trigger_data) {
+        if (empty($trigger_data) || empty($trigger_data['type'])) {
+            return null;
         }
 
-        return $animation;
+        $trigger = ['type' => $trigger_data['type']];
+
+        switch ($trigger_data['type']) {
+            case 'scroll':
+                $trigger = [
+                    'type' => 'scroll',
+                    'start' => $trigger_data['start'] ?? 'top center',
+                    'end' => $trigger_data['end'] ?? 'bottom center',
+                    'scrub' => !empty($trigger_data['scrubType']) && $trigger_data['scrubType'] !== 'none',
+                    'markers' => !empty($trigger_data['markers']),
+                    'pin' => !empty($trigger_data['pin'])
+                ];
+                break;
+                
+            case 'hover':
+            case 'click':
+                $trigger = [
+                    'type' => $trigger_data['type'],
+                    'reverse' => !empty($trigger_data['reverse'])
+                ];
+                break;
+                
+            case 'load':
+                // Pour load, pas besoin de trigger spécial
+                break;
+        }
+
+        return $trigger;
     }
 
-    /**
-     * Génère le code JavaScript à partir de la structure JSON
-     */
+    private function extract_animation_data($block) {
+        return [
+            'gsapAnimation' => $block['gsapAnimation'],
+            'timeline' => $block['timeline'],
+            'elementId' => $block['elementId'],
+            'trigger' => $block['trigger']
+        ];
+    }
+
+    private function handle_trigger_js($timeline_id, $trigger) {
+        if (empty($trigger) || empty($trigger['type'])) {
+            return '';
+        }
+
+        $js = '';
+        switch ($trigger['type']) {
+            case 'hover':
+                $js .= "    {$timeline_id}.eventCallback(\"onEnter\", function() {\n";
+                $js .= "        {$timeline_id}.play();\n";
+                $js .= "    });\n";
+                $js .= "    {$timeline_id}.eventCallback(\"onLeave\", function() {\n";
+                if (!empty($trigger['reverse'])) {
+                    $js .= "        {$timeline_id}.reverse();\n";
+                } else {
+                    $js .= "        {$timeline_id}.pause();\n";
+                }
+                $js .= "    });\n";
+                break;
+
+            case 'click':
+                $js .= "    document.querySelector('#{$timeline_id}').addEventListener('click', function() {\n";
+                if (!empty($trigger['reverse'])) {
+                    $js .= "        {$timeline_id}.reversed() ? {$timeline_id}.play() : {$timeline_id}.reverse();\n";
+                } else {
+                    $js .= "        {$timeline_id}.play();\n";
+                }
+                $js .= "    });\n";
+                break;
+
+            case 'scroll':
+                return json_encode([
+                    'trigger' => "#{$timeline_id}",
+                    'start' => $trigger['start'] ?? 'top center',
+                    'end' => $trigger['end'] ?? 'bottom center',
+                    'scrub' => !empty($trigger['scrubType']) && $trigger['scrubType'] !== 'none',
+                    'markers' => !empty($trigger['markers']),
+                    'pin' => !empty($trigger['pin'])
+                ]);
+        }
+
+        return $js;
+    }
+
     private function generate_js_from_json($json) {
         $js = "document.addEventListener('DOMContentLoaded', function() {\n";
+        $js .= "    // Initialisation de GSAP et ScrollTrigger\n";
         $js .= "    gsap.registerPlugin(ScrollTrigger);\n\n";
 
-        // Générer les timelines
-        foreach ($json['timelines'] as $timeline) {
-            if (!empty($timeline['name'])) {
-                $js .= "    // Timeline: {$timeline['name']}\n";
-            }
-            
-            $js .= "    const timeline_{$timeline['id']} = gsap.timeline({\n";
-            
-            if (isset($timeline['defaults'])) {
-                $js .= "        defaults: " . $this->format_json($timeline['defaults']) . ",\n";
-            }
-            
-            $js .= "        scrollTrigger: " . $this->format_json($timeline['scrollTrigger']) . "\n";
-            $js .= "    });\n\n";
-
-            foreach ($timeline['animations'] as $animation) {
-                $js .= "    timeline_{$timeline['id']} .fromTo('#{$animation['elementId']}', ";
-                $js .= $this->format_json($animation['from']) . ", ";
+        // Génération des timelines
+        if (!empty($json['timelines'])) {
+            foreach ($json['timelines'] as $timeline) {
+                $js .= "    // " . $timeline['name'] . "\n";
+                $js .= "    const " . $timeline['id'] . " = gsap.timeline(";
                 
-                $to = array_merge(
+                $timeline_config = [];
+                
+                // Defaults
+                if (!empty($timeline['defaults'])) {
+                    $timeline_config['defaults'] = $timeline['defaults'];
+                }
+                
+                // ScrollTrigger
+                if (!empty($timeline['trigger']) && $timeline['trigger']['type'] === 'scroll') {
+                    $scroll_trigger = $this->handle_trigger_js($timeline['id'], $timeline['trigger']);
+                    if ($scroll_trigger) {
+                        $timeline_config['scrollTrigger'] = json_decode($scroll_trigger, true);
+                    }
+                }
+                
+                $js .= !empty($timeline_config) ? json_encode($timeline_config) : '';
+                $js .= ");\n\n";
+
+                // Animations de la timeline
+                if (!empty($timeline['animations'])) {
+                    foreach ($timeline['animations'] as $animation) {
+                        $js .= "    " . $timeline['id'] . "\n";
+                        $js .= "        .fromTo(\"#" . $animation['elementId'] . "\",\n";
+                        $js .= "            " . json_encode($animation['from']) . ",\n";
+                        $js .= "            " . json_encode(array_merge(
+                            $animation['to'],
+                            [
+                                'duration' => $animation['duration'],
+                                'ease' => $animation['ease']
+                            ]
+                        )) . ",\n";
+                        $js .= "            \"" . $animation['position'] . "\"\n";
+                        $js .= "        )\n";
+                    }
+                    $js .= "    ;\n\n";
+                }
+
+                // Gestion des triggers non-scroll
+                if (!empty($timeline['trigger']) && $timeline['trigger']['type'] !== 'scroll') {
+                    $js .= $this->handle_trigger_js($timeline['id'], $timeline['trigger']);
+                }
+            }
+        }
+
+        // Animations standalone
+        if (!empty($json['standaloneAnimations'])) {
+            foreach ($json['standaloneAnimations'] as $animation) {
+                $js .= "    gsap.fromTo(\"#" . $animation['elementId'] . "\",\n";
+                $js .= "        " . json_encode($animation['from']) . ",\n";
+                
+                $to_config = array_merge(
                     $animation['to'],
-                    array_filter([
-                        'duration' => $animation['duration'] ?? null,
-                        'ease' => $animation['ease'] ?? null
-                    ])
+                    [
+                        'duration' => $animation['duration'],
+                        'ease' => $animation['ease']
+                    ]
                 );
-                $js .= $this->format_json($to);
                 
-                if (isset($animation['position'])) {
-                    $js .= ", " . $animation['position'];
+                if (!empty($animation['trigger']) && $animation['trigger']['type'] === 'scroll') {
+                    $scroll_trigger = $this->handle_trigger_js($animation['elementId'], $animation['trigger']);
+                    if ($scroll_trigger) {
+                        $to_config['scrollTrigger'] = json_decode($scroll_trigger, true);
+                    }
                 }
                 
-                $js .= " );\n";
-            }
-            
-            $js .= "\n";
-        }
+                $js .= "        " . json_encode($to_config) . "\n";
+                $js .= "    );\n\n";
 
-        // Générer les animations standalone
-        foreach ($json['standaloneAnimations'] as $animation) {
-            if ($animation['type'] === 'from') {
-                $js .= "    gsap.from('#{$animation['elementId']}', {\n";
-                foreach ($animation['from'] as $prop => $value) {
-                    $js .= "        $prop: " . json_encode($value) . ",\n";
+                // Gestion des triggers non-scroll pour les animations standalone
+                if (!empty($animation['trigger']) && $animation['trigger']['type'] !== 'scroll') {
+                    $js .= $this->handle_trigger_js($animation['elementId'], $animation['trigger']);
                 }
-                $js .= "        duration: " . $animation['duration'] . ",\n";
-                $js .= "        ease: '" . $animation['ease'] . "'";
-                
-                if ($animation['scrollTrigger']) {
-                    $js .= ",\n        scrollTrigger: " . $this->format_json($animation['scrollTrigger']);
-                }
-                
-                $js .= "\n    });\n\n";
-            } else {
-                $js .= "    // Standalone animation\n";
-                $js .= "    gsap.fromTo('#{$animation['elementId']}', ";
-                $js .= $this->format_json($animation['from']) . ", ";
-                $js .= "{ ..." . $this->format_json($animation['to']) . ",\n";
-                if ($animation['duration']) {
-                    $js .= "        duration: " . $animation['duration'] . ",\n";
-                }
-                if ($animation['ease']) {
-                    $js .= "        ease: '" . $animation['ease'] . "'";
-                }
-                
-                if ($animation['scrollTrigger']) {
-                    $js .= ",\n        scrollTrigger: " . $this->format_json($animation['scrollTrigger']);
-                }
-                
-                $js .= "\n    });\n\n";
             }
         }
 
-        $js .= "});";
+        $js .= "});\n";
         return $js;
     }
 
