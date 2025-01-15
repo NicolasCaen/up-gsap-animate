@@ -46,8 +46,8 @@ export const AnimationPanel = ({ attributes, setAttributes, timelineInfo, anchor
             ...value
         };
 
-        // Si on active le mode timeline parent, utiliser l'anchor comme timelineId
-        if (value.isTimelineParent && !timeline.timelineId) {
+        // Toujours utiliser l'anchor comme timelineId pour les timeline parents
+        if (value.isTimelineParent || timeline.isTimelineParent) {
             if (!anchor) {
                 console.warn('No anchor provided for timeline parent block. Please set a block anchor.');
                 return;
@@ -198,16 +198,20 @@ export const AnimationPanel = ({ attributes, setAttributes, timelineInfo, anchor
                 className="up-gsap-animation-section"
             >
                 <SelectControl
-                    label={__('Timeline Role', 'up-gsap-animate')}
-                    value={gsapAnimation.role || 'none'}
+                    label={__('Role', 'up-gsap-animate')}
+                    value={gsapAnimation.role}
                     options={[
                         { label: __('None', 'up-gsap-animate'), value: 'none' },
-                        { label: __('Standalone', 'up-gsap-animate'), value: 'standalone' },
-                        { label: __('Timeline Parent', 'up-gsap-animate'), value: 'timeline-parent' },
-                        { label: __('Timeline Child', 'up-gsap-animate'), value: 'timeline-child' }
+                        { label: __('Timeline Parent', 'up-gsap-animate'), value: 'timeline-parent', disabled: !anchor },
+                        { label: __('Timeline Child', 'up-gsap-animate'), value: 'timeline-child' },
+                        { label: __('Standalone', 'up-gsap-animate'), value: 'standalone' }
                     ]}
                     onChange={(role) => {
-                        updateGsapAnimation({ 
+                        if (role === 'timeline-parent' && !anchor) {
+                            console.warn('Cannot set as timeline parent: no anchor defined');
+                            return;
+                        }
+                        updateGsapAnimation({
                             role,
                             enabled: role !== 'none'
                         });
@@ -218,6 +222,12 @@ export const AnimationPanel = ({ attributes, setAttributes, timelineInfo, anchor
                         }
                     }}
                 />
+
+                {!anchor && (
+                    <div className="components-notice is-warning">
+                        <p>{__('To use this block as a timeline parent, please set a block anchor in the Advanced panel.', 'up-gsap-animate')}</p>
+                    </div>
+                )}
 
                 {gsapAnimation.role === 'timeline-parent' && (
                     <TextControl

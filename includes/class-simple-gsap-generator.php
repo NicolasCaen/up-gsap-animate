@@ -30,25 +30,29 @@ class GSAP_Animation_Generator {
         error_log("=== Analyzing Content ===");
         error_log($content);
         
-        // Recherche des blocs avec gsapAnimation
-        preg_match_all('/<!-- wp:[^\s]+ (.*?"gsapAnimation".*?) -->(.*?)<!-- \/wp:[^\s]+ -->/s', $content, $matches, PREG_SET_ORDER);
+        // Recherche tous les blocs avec gsapAnimation
+        preg_match_all('/<!-- wp:[^\s]+ ({.*?"gsapAnimation".*?}) -->/', $content, $matches, PREG_SET_ORDER);
         
         error_log("=== Found Blocks ===");
         error_log(print_r($matches, true));
         
         foreach ($matches as $match) {
             $config = json_decode($match[1], true);
-            $html = $match[2];
             
             if ($config === null || !isset($config['gsapAnimation'])) {
                 continue;
             }
             
-            // Extraire l'ID du HTML
-            preg_match('/<[^>]*\bid=["\']([^"\']+)["\'][^>]*>/', $html, $id_match);
-            $elementId = $id_match ? $id_match[1] : null;
+            // Chercher l'ID dans le HTML qui suit immédiatement
+            $pos = strpos($content, $match[0]) + strlen($match[0]);
+            $next_html = substr($content, $pos, 200); // On regarde les 200 prochains caractères
             
-            // Si c'est un bloc avec une animation, l'ajouter à notre liste
+            if (preg_match('/<[^>]*?\bid=["\']([^"\']+)["\']/', $next_html, $id_match)) {
+                $elementId = $id_match[1];
+            } else {
+                continue;
+            }
+            
             $blocks[] = [
                 'gsapAnimation' => $config['gsapAnimation'],
                 'timeline' => $config['timeline'] ?? [],
@@ -172,8 +176,16 @@ class GSAP_Animation_Generator {
                 
                 // Rechercher le bon timeline parent
                 foreach ($structure['timelines'] as $timelineId => $timeline) {
-                    if ($timelineId === $parentId || $timeline['name'] === $parentId) {
-                        $animation = [
+                    // Vérifier si l'ID de la timeline correspond à l'ID du parent
+                    // ou si l'elementId du parent correspond
+                    if ($timelineId === $parentId || $timeline['id'] === $parentId) {
+                        // S'assurer que le tableau animations existe
+                        if (!isset($structure['timelines'][$timelineId]['animations'])) {
+                            $structure['timelines'][$timelineId]['animations'] = [];
+                        }
+
+                        // Ajouter la nouvelle animation au tableau
+                        $structure['timelines'][$timelineId]['animations'][] = [
                             'elementId' => $block['elementId'],
                             'from' => $block['gsapAnimation']['from'],
                             'to' => $block['gsapAnimation']['to'],
@@ -181,7 +193,6 @@ class GSAP_Animation_Generator {
                             'ease' => $block['gsapAnimation']['ease'] ?? null,
                             'position' => $block['timeline']['position'] ?? null
                         ];
-                        $structure['timelines'][$timelineId]['animations'][] = $animation;
                         break;
                     }
                 }
