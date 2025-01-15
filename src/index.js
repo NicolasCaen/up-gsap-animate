@@ -99,10 +99,12 @@ const PluginAnimationSidebar = () => {
         // Trouver tous les blocs parents de timeline disponibles
         const availableParents = allBlocks.filter(block => 
             block.attributes?.timeline?.isTimelineParent && 
-            block !== currentBlock
+            block !== currentBlock &&
+            block.attributes?.anchor // S'assurer que le block a un anchor
         ).map(block => ({
-            timelineId: block.attributes.timeline.timelineId,
-            name: block.attributes.timeline.name || `Timeline ${block.attributes.timeline.timelineId}`,
+            value: block.attributes.anchor,
+            label: block.attributes.timeline.name || block.attributes.anchor,
+            timelineId: block.attributes.anchor,
             blockName: block.name && block.name.replace('core/', '').replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())
         }));
 
@@ -110,8 +112,8 @@ const PluginAnimationSidebar = () => {
         let timelineParent = null;
 
         // Si le bloc sélectionné est un parent de timeline, récupérer ses enfants
-        if (currentBlock?.attributes?.timeline?.isTimelineParent && currentBlock?.attributes?.timeline?.timelineId) {
-            const timelineId = currentBlock.attributes.timeline.timelineId;
+        if (currentBlock?.attributes?.timeline?.isTimelineParent && currentBlock?.attributes?.anchor) {
+            const timelineId = currentBlock.attributes.anchor;
             timelineChildren = allBlocks.filter(block => 
                 block.attributes?.timeline?.timelineParentId === timelineId
             );
@@ -123,7 +125,7 @@ const PluginAnimationSidebar = () => {
         if (currentBlock?.attributes?.timeline?.timelineParentId) {
             const parentTimelineId = currentBlock.attributes.timeline.timelineParentId;
             timelineParent = allBlocks.find(block => 
-                block.attributes?.timeline?.timelineId === parentTimelineId
+                block.attributes?.anchor === parentTimelineId
             );
             // Get siblings (other children of the same parent)
             if (timelineParent) {
@@ -136,10 +138,6 @@ const PluginAnimationSidebar = () => {
                 console.log('Timeline Child - Siblings:', timelineChildren);
             }
         }
-
-        // Debug final values
-        console.log('Final timelineChildren:', timelineChildren?.length);
-        console.log('Final timelineParent:', timelineParent?.attributes?.timeline?.timelineId);
 
         return { 
             currentBlock, 
@@ -182,6 +180,7 @@ const PluginAnimationSidebar = () => {
                                 timelineParent: selectedBlock.timelineParent,
                                 availableParents: selectedBlock.availableParents
                             }}
+                            anchor={selectedBlock.currentBlock.attributes?.anchor}
                         />
                     </div>
                 ) : (

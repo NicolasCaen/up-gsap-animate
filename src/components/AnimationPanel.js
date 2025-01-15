@@ -9,11 +9,12 @@ import {
     TextareaControl,
     Panel
 } from '@wordpress/components';
+import { useEffect } from '@wordpress/element';
 
 // Récupérer les animations depuis PHP
 const { animations: phpAnimations = {}, easings: phpEasings = [] } = window.upGsapAnimateSettings || {};
 
-export const AnimationPanel = ({ attributes, setAttributes, timelineInfo }) => {
+export const AnimationPanel = ({ attributes, setAttributes, timelineInfo, anchor }) => {
     const { gsapAnimation, trigger, timeline } = attributes;
     const { isTimelineParent, timelineChildren, timelineParent, availableParents } = timelineInfo || {};
 
@@ -45,9 +46,13 @@ export const AnimationPanel = ({ attributes, setAttributes, timelineInfo }) => {
             ...value
         };
 
-        // Si on active le mode timeline parent, générer un ID unique
+        // Si on active le mode timeline parent, utiliser l'anchor comme timelineId
         if (value.isTimelineParent && !timeline.timelineId) {
-            newTimeline.timelineId = 'timeline-' + Math.random().toString(36).substr(2, 9);
+            if (!anchor) {
+                console.warn('No anchor provided for timeline parent block. Please set a block anchor.');
+                return;
+            }
+            newTimeline.timelineId = anchor;
         }
 
         setAttributes({
@@ -109,53 +114,75 @@ export const AnimationPanel = ({ attributes, setAttributes, timelineInfo }) => {
         { value: 'standalone', label: __('Standalone Animation', 'up-gsap-animate') }
     ];
 
-    // Determine current animation type
-    const getCurrentType = () => {
-        if (!gsapAnimation.enabled) return 'none';
-        if (timeline.isTimelineParent) return 'timeline-parent';
-        if (timeline.timelineParentId) return 'timeline-child';
-        return 'standalone';
-    };
+    // Update animation type when conditions change
+    useEffect(() => {
+        let newType = 'none';
+        if (gsapAnimation.enabled) {
+            if (timeline.isTimelineParent) newType = 'timeline-parent';
+            else if (timeline.timelineParentId) newType = 'timeline-child';
+            else newType = 'standalone';
+        }
+        if (gsapAnimation.type !== newType) {
+            setAttributes({ 
+                gsapAnimation: {
+                    ...gsapAnimation,
+                    type: newType
+                }
+            });
+        }
+    }, [gsapAnimation.enabled, timeline.isTimelineParent, timeline.timelineParentId]);
 
     // Handle animation type change
     const handleTypeChange = (type) => {
-        const newTimeline = { ...timeline };
-        
         // Reset timeline settings
-        newTimeline.isTimelineParent = false;
-        newTimeline.timelineParentId = '';
-        newTimeline.position = '';
-        newTimeline.timelineId = '';
-        
+        const newTimeline = {
+            ...timeline,
+            isTimelineParent: false,
+            timelineParentId: '',
+            position: '',
+            stagger: 0.2,
+            globalDuration: 1,
+            defaults: {
+                ease: 'power2.out',
+                duration: 1
+            }
+        };
+
         // Set new type-specific settings
         if (type === 'timeline-parent') {
             newTimeline.isTimelineParent = true;
-            newTimeline.timelineId = 'timeline-' + Math.random().toString(36).substr(2, 9);
+            newTimeline.timelineId = anchor;
+            // Ne pas écraser le nom s'il existe déjà
+            if (!newTimeline.name) {
+                newTimeline.name = anchor;
+            }
         } else if (type === 'timeline-child') {
             // Si des parents sont disponibles, sélectionner le premier par défaut
             if (availableParents?.length > 0) {
-                newTimeline.timelineParentId = availableParents[0].timelineId;
+                newTimeline.timelineParentId = availableParents[0].timelineId || availableParents[0].value;
             }
         }
 
-        // Update gsapAnimation enabled state and reset animation if needed
-        if (type === 'none') {
-            updateGsapAnimation({ enabled: false });
-        } else {
-            // Activer l'animation si elle ne l'est pas déjà
-            if (!gsapAnimation.enabled) {
-                updateGsapAnimation({ 
-                    enabled: true,
-                    type: 'fade',
-                    duration: 1,
-                    ease: 'power2.out',
-                    from: { opacity: 0 },
-                    to: { opacity: 1 }
-                });
-            }
+        // Prepare new animation settings
+        const newGsapAnimation = {
+            ...gsapAnimation,
+            type,
+            enabled: type !== 'none'
+        };
+
+        // If switching from disabled to enabled, set default animation
+        if (!gsapAnimation.enabled && type !== 'none') {
+            newGsapAnimation.duration = 1;
+            newGsapAnimation.ease = 'power2.out';
+            newGsapAnimation.from = { opacity: 0 };
+            newGsapAnimation.to = { opacity: 1 };
         }
-        
-        setAttributes({ timeline: newTimeline });
+
+        // Update attributes
+        setAttributes({
+            gsapAnimation: newGsapAnimation,
+            timeline: newTimeline
+        });
     };
 
     return (
@@ -167,12 +194,12 @@ export const AnimationPanel = ({ attributes, setAttributes, timelineInfo }) => {
             >
                 <SelectControl
                     label={__('Type', 'up-gsap-animate')}
-                    value={getCurrentType()}
+                    value={gsapAnimation.type}
                     options={animationTypes}
                     onChange={handleTypeChange}
                 />
                 
-                {getCurrentType() === 'timeline-parent' && (
+                {gsapAnimation.type === 'timeline-parent' && (
                     <TextControl
                         label={__('Timeline Name', 'up-gsap-animate')}
                         value={timeline.name || ''}
@@ -181,7 +208,7 @@ export const AnimationPanel = ({ attributes, setAttributes, timelineInfo }) => {
                     />
                 )}
 
-                {getCurrentType() === 'timeline-child' && (
+                {gsapAnimation.type === 'timeline-child' && (
                     <>
                         <SelectControl
                             label={__('Parent Timeline', 'up-gsap-animate')}
@@ -189,8 +216,8 @@ export const AnimationPanel = ({ attributes, setAttributes, timelineInfo }) => {
                             options={[
                                 { label: __('None', 'up-gsap-animate'), value: '' },
                                 ...availableParents.map(parent => ({
-                                    label: parent.name,
-                                    value: parent.timelineId
+                                    label: parent.label,
+                                    value: parent.value
                                 }))
                             ]}
                             onChange={(timelineParentId) => updateTimeline({ timelineParentId })}
@@ -199,7 +226,7 @@ export const AnimationPanel = ({ attributes, setAttributes, timelineInfo }) => {
                 )}
             </PanelBody>
 
-            {(getCurrentType() === 'standalone' || getCurrentType() === 'timeline-parent') && (
+            {(gsapAnimation.type === 'standalone' || gsapAnimation.type === 'timeline-parent') && (
                 <PanelBody
                     title={__('Trigger', 'up-gsap-animate')}
                     initialOpen={true}
@@ -279,7 +306,7 @@ export const AnimationPanel = ({ attributes, setAttributes, timelineInfo }) => {
                 </PanelBody>
             )}
 
-            {(getCurrentType() === 'timeline-parent' && (
+            {(gsapAnimation.type === 'timeline-parent' && (
                 <PanelBody
                     title={__('Timeline Settings', 'up-gsap-animate')}
                     initialOpen={true}
@@ -317,7 +344,7 @@ export const AnimationPanel = ({ attributes, setAttributes, timelineInfo }) => {
                 </PanelBody>
             ))}
 
-            {(getCurrentType() === 'standalone' || getCurrentType() === 'timeline-child') && (
+            {(gsapAnimation.type === 'standalone' || gsapAnimation.type === 'timeline-child') && (
                 <PanelBody
                     title={__('Animation', 'up-gsap-animate')}
                     initialOpen={true}
@@ -358,7 +385,7 @@ export const AnimationPanel = ({ attributes, setAttributes, timelineInfo }) => {
                 </PanelBody>
             )}
 
-            {(getCurrentType() === 'timeline-child') && (
+            {(gsapAnimation.type === 'timeline-child') && (
                 <PanelBody
                     title={__('Timeline Position', 'up-gsap-animate')}
                     initialOpen={true}
@@ -373,7 +400,7 @@ export const AnimationPanel = ({ attributes, setAttributes, timelineInfo }) => {
                 </PanelBody>
             )}
 
-            {(getCurrentType() !== 'none' && gsapAnimation.type === 'custom') && (
+            {(gsapAnimation.type !== 'none' && gsapAnimation.type === 'custom') && (
                 <PanelBody
                     title={__('Advanced Settings', 'up-gsap-animate')}
                     initialOpen={false}
