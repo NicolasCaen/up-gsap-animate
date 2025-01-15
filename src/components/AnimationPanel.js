@@ -107,33 +107,38 @@ export const AnimationPanel = ({ attributes, setAttributes, timelineInfo, anchor
         ...phpEasings
     ];
 
-    const animationTypes = [
-        { value: 'none', label: __('None', 'up-gsap-animate') },
+    const animationRoles = [
+        { value: 'standalone', label: __('Standalone', 'up-gsap-animate') },
         { value: 'timeline-parent', label: __('Timeline Parent', 'up-gsap-animate') },
-        { value: 'timeline-child', label: __('Timeline Child', 'up-gsap-animate') },
-        { value: 'standalone', label: __('Standalone Animation', 'up-gsap-animate') }
+        { value: 'timeline-child', label: __('Timeline Child', 'up-gsap-animate') }
+    ];
+
+    const animationTypes = [
+        { value: 'from', label: __('From', 'up-gsap-animate') },
+        { value: 'to', label: __('To', 'up-gsap-animate') },
+        { value: 'fromTo', label: __('From To', 'up-gsap-animate') }
     ];
 
     // Update animation type when conditions change
     useEffect(() => {
-        let newType = 'none';
+        let newRole = 'none';
         if (gsapAnimation.enabled) {
-            if (timeline.isTimelineParent) newType = 'timeline-parent';
-            else if (timeline.timelineParentId) newType = 'timeline-child';
-            else newType = 'standalone';
+            if (timeline.isTimelineParent) newRole = 'timeline-parent';
+            else if (timeline.timelineParentId) newRole = 'timeline-child';
+            else newRole = 'standalone';
         }
-        if (gsapAnimation.type !== newType) {
+        if (gsapAnimation.role !== newRole) {
             setAttributes({ 
                 gsapAnimation: {
                     ...gsapAnimation,
-                    type: newType
+                    role: newRole
                 }
             });
         }
     }, [gsapAnimation.enabled, timeline.isTimelineParent, timeline.timelineParentId]);
 
     // Handle animation type change
-    const handleTypeChange = (type) => {
+    const handleTypeChange = (role) => {
         // Reset timeline settings
         const newTimeline = {
             ...timeline,
@@ -149,14 +154,14 @@ export const AnimationPanel = ({ attributes, setAttributes, timelineInfo, anchor
         };
 
         // Set new type-specific settings
-        if (type === 'timeline-parent') {
+        if (role === 'timeline-parent') {
             newTimeline.isTimelineParent = true;
             newTimeline.timelineId = anchor;
             // Ne pas écraser le nom s'il existe déjà
             if (!newTimeline.name) {
                 newTimeline.name = anchor;
             }
-        } else if (type === 'timeline-child') {
+        } else if (role === 'timeline-child') {
             // Si des parents sont disponibles, sélectionner le premier par défaut
             if (availableParents?.length > 0) {
                 newTimeline.timelineParentId = availableParents[0].timelineId || availableParents[0].value;
@@ -166,12 +171,12 @@ export const AnimationPanel = ({ attributes, setAttributes, timelineInfo, anchor
         // Prepare new animation settings
         const newGsapAnimation = {
             ...gsapAnimation,
-            type,
-            enabled: type !== 'none'
+            role,
+            enabled: role !== 'none'
         };
 
         // If switching from disabled to enabled, set default animation
-        if (!gsapAnimation.enabled && type !== 'none') {
+        if (!gsapAnimation.enabled && role !== 'none') {
             newGsapAnimation.duration = 1;
             newGsapAnimation.ease = 'power2.out';
             newGsapAnimation.from = { opacity: 0 };
@@ -188,18 +193,33 @@ export const AnimationPanel = ({ attributes, setAttributes, timelineInfo, anchor
     return (
         <>
             <PanelBody
-                title={__('Animation Type', 'up-gsap-animate')}
+                title={__('Animation', 'up-gsap-animate')}
                 initialOpen={true}
-                className="up-gsap-type-section"
+                className="up-gsap-animation-section"
             >
                 <SelectControl
-                    label={__('Type', 'up-gsap-animate')}
-                    value={gsapAnimation.type}
-                    options={animationTypes}
-                    onChange={handleTypeChange}
+                    label={__('Timeline Role', 'up-gsap-animate')}
+                    value={gsapAnimation.role || 'none'}
+                    options={[
+                        { label: __('None', 'up-gsap-animate'), value: 'none' },
+                        { label: __('Standalone', 'up-gsap-animate'), value: 'standalone' },
+                        { label: __('Timeline Parent', 'up-gsap-animate'), value: 'timeline-parent' },
+                        { label: __('Timeline Child', 'up-gsap-animate'), value: 'timeline-child' }
+                    ]}
+                    onChange={(role) => {
+                        updateGsapAnimation({ 
+                            role,
+                            enabled: role !== 'none'
+                        });
+                        if (role === 'timeline-parent') {
+                            updateTimeline({ isTimelineParent: true });
+                        } else {
+                            updateTimeline({ isTimelineParent: false });
+                        }
+                    }}
                 />
-                
-                {gsapAnimation.type === 'timeline-parent' && (
+
+                {gsapAnimation.role === 'timeline-parent' && (
                     <TextControl
                         label={__('Timeline Name', 'up-gsap-animate')}
                         value={timeline.name || ''}
@@ -208,25 +228,23 @@ export const AnimationPanel = ({ attributes, setAttributes, timelineInfo, anchor
                     />
                 )}
 
-                {gsapAnimation.type === 'timeline-child' && (
-                    <>
-                        <SelectControl
-                            label={__('Parent Timeline', 'up-gsap-animate')}
-                            value={timeline.timelineParentId}
-                            options={[
-                                { label: __('None', 'up-gsap-animate'), value: '' },
-                                ...availableParents.map(parent => ({
-                                    label: parent.label,
-                                    value: parent.value
-                                }))
-                            ]}
-                            onChange={(timelineParentId) => updateTimeline({ timelineParentId })}
-                        />
-                    </>
+                {gsapAnimation.role === 'timeline-child' && (
+                    <SelectControl
+                        label={__('Parent Timeline', 'up-gsap-animate')}
+                        value={timeline.timelineParentId}
+                        options={[
+                            { label: __('None', 'up-gsap-animate'), value: '' },
+                            ...availableParents.map(parent => ({
+                                label: parent.label,
+                                value: parent.value
+                            }))
+                        ]}
+                        onChange={(timelineParentId) => updateTimeline({ timelineParentId })}
+                    />
                 )}
             </PanelBody>
 
-            {(gsapAnimation.type === 'standalone' || gsapAnimation.type === 'timeline-parent') && (
+            {(gsapAnimation.role === 'standalone' || gsapAnimation.role === 'timeline-parent') && (
                 <PanelBody
                     title={__('Trigger', 'up-gsap-animate')}
                     initialOpen={true}
@@ -306,7 +324,7 @@ export const AnimationPanel = ({ attributes, setAttributes, timelineInfo, anchor
                 </PanelBody>
             )}
 
-            {(gsapAnimation.type === 'timeline-parent' && (
+            {(gsapAnimation.role === 'timeline-parent' && (
                 <PanelBody
                     title={__('Timeline Settings', 'up-gsap-animate')}
                     initialOpen={true}
@@ -344,7 +362,7 @@ export const AnimationPanel = ({ attributes, setAttributes, timelineInfo, anchor
                 </PanelBody>
             ))}
 
-            {(gsapAnimation.type === 'standalone' || gsapAnimation.type === 'timeline-child') && (
+            {(gsapAnimation.role === 'standalone' || gsapAnimation.role === 'timeline-child') && (
                 <PanelBody
                     title={__('Animation', 'up-gsap-animate')}
                     initialOpen={true}
@@ -352,7 +370,7 @@ export const AnimationPanel = ({ attributes, setAttributes, timelineInfo, anchor
                 >
                     <SelectControl
                         label={__('Animation Type', 'up-gsap-animate')}
-                        value={gsapAnimation.type}
+                        value={gsapAnimation.animationType || 'from'}
                         options={Object.entries(presetAnimations).map(([value, { label }]) => ({
                             label,
                             value
@@ -360,7 +378,7 @@ export const AnimationPanel = ({ attributes, setAttributes, timelineInfo, anchor
                         onChange={(type) => {
                             const preset = presetAnimations[type];
                             updateGsapAnimation({
-                                type,
+                                animationType: type,
                                 from: preset.from,
                                 to: preset.to
                             });
@@ -385,7 +403,7 @@ export const AnimationPanel = ({ attributes, setAttributes, timelineInfo, anchor
                 </PanelBody>
             )}
 
-            {(gsapAnimation.type === 'timeline-child') && (
+            {(gsapAnimation.role === 'timeline-child') && (
                 <PanelBody
                     title={__('Timeline Position', 'up-gsap-animate')}
                     initialOpen={true}
@@ -400,7 +418,7 @@ export const AnimationPanel = ({ attributes, setAttributes, timelineInfo, anchor
                 </PanelBody>
             )}
 
-            {(gsapAnimation.type !== 'none' && gsapAnimation.type === 'custom') && (
+            {(gsapAnimation.role !== 'none' && gsapAnimation.animationType === 'custom') && (
                 <PanelBody
                     title={__('Advanced Settings', 'up-gsap-animate')}
                     initialOpen={false}

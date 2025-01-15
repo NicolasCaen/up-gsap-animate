@@ -71,7 +71,7 @@ class UP_GSAP_Timeline_Generator extends UP_GSAP_Base_Generator {
             foreach ($timeline['children'] as $index => $child) {
                 if (empty($child['anchor'])) continue;
 
-                $animation = $this->generate_animation_props($child['animation']);
+                $animation_code = $this->generate_animation_code($child);
                 
                 // Position dans la timeline
                 $position = "";
@@ -79,13 +79,52 @@ class UP_GSAP_Timeline_Generator extends UP_GSAP_Base_Generator {
                     $position = ", '" . $child['position'] . "'";
                 }
 
-                $js .= "        ." . $animation['method'] . "('#" . $child['anchor'] . "', {\n";
-                $js .= implode(",\n", $animation['props']) . "\n";
-                $js .= "        }" . $position . ")" . ($index < count($timeline['children']) - 1 ? "\n" : ";\n\n");
+                $js .= "        " . $animation_code . $position . ($index < count($timeline['children']) - 1 ? "\n" : ";\n\n");
             }
         }
 
         return $js;
+    }
+
+    /**
+     * Génère le code d'animation pour un élément
+     */
+    protected function generate_animation_code($animation) {
+        $code = '';
+        
+        // Déterminer le type d'animation en fonction des propriétés disponibles
+        if (!empty($animation['animation']['from']) && !empty($animation['animation']['to'])) {
+            // Si on a from et to, utiliser fromTo
+            $code .= sprintf(
+                ".fromTo('#%s', %s, %s, %s)",
+                $animation['anchor'],
+                json_encode($animation['animation']['from']),
+                json_encode($animation['animation']['to']),
+                json_encode($animation['animation']['duration'])
+            );
+        } else if (!empty($animation['animation']['to'])) {
+            // Si on a uniquement to, utiliser to
+            $code .= sprintf(
+                ".to('#%s', %s, %s)",
+                $animation['anchor'],
+                json_encode($animation['animation']['to']),
+                json_encode($animation['animation']['duration'])
+            );
+        } else {
+            // Par défaut ou si on a uniquement from, utiliser from
+            $code .= sprintf(
+                ".from('#%s', %s, %s)",
+                $animation['anchor'],
+                json_encode($animation['animation']['from']),
+                json_encode($animation['animation']['duration'])
+            );
+        }
+
+        if (!empty($animation['animation']['ease'])) {
+            $code .= sprintf(".ease('%s')", $animation['animation']['ease']);
+        }
+
+        return $code;
     }
 
     /**

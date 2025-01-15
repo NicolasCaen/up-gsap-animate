@@ -117,7 +117,7 @@ class UP_GSAP_Animate {
     public function collect_animations($block) {
         error_log('Checking block attributes: ' . print_r($block['attrs'], true));
         
-        if (empty($block['attrs']['gsapAnimation']) || empty($block['attrs']['gsapAnimation']['enabled'])) {
+        if (empty($block['attrs']['gsapAnimation']['enabled'])) {
             error_log('Block skipped: no animation or not enabled');
             return;
         }
@@ -147,6 +147,7 @@ class UP_GSAP_Animate {
             $this->timelines[$timeline_id] = array(
                 'anchor' => $element_id,
                 'animation' => array(
+                    'type' => isset($animation_data['animationType']) ? $animation_data['animationType'] : 'from',
                     'from' => isset($animation_data['from']) ? $animation_data['from'] : array(),
                     'duration' => isset($animation_data['duration']) ? $animation_data['duration'] : 1,
                     'ease' => isset($animation_data['ease']) ? $animation_data['ease'] : 'power2.out'
@@ -164,6 +165,7 @@ class UP_GSAP_Animate {
             $animation = array(
                 'anchor' => $element_id,
                 'animation' => array(
+                    'type' => isset($animation_data['animationType']) ? $animation_data['animationType'] : 'from',
                     'from' => isset($animation_data['from']) ? $animation_data['from'] : array(),
                     'duration' => isset($animation_data['duration']) ? $animation_data['duration'] : 1,
                     'ease' => isset($animation_data['ease']) ? $animation_data['ease'] : 'power2.out'
@@ -180,6 +182,7 @@ class UP_GSAP_Animate {
             $this->animations[] = array(
                 'anchor' => $element_id,
                 'animation' => array(
+                    'type' => isset($animation_data['animationType']) ? $animation_data['animationType'] : 'from',
                     'from' => isset($animation_data['from']) ? $animation_data['from'] : array(),
                     'duration' => isset($animation_data['duration']) ? $animation_data['duration'] : 1,
                     'ease' => isset($animation_data['ease']) ? $animation_data['ease'] : 'power2.out'
