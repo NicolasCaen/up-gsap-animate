@@ -214,9 +214,11 @@ class GSAP_Animation_Generator {
                     'type' => 'scroll',
                     'start' => $trigger_data['start'] ?? 'top center',
                     'end' => $trigger_data['end'] ?? 'bottom center',
-                    'scrub' => !empty($trigger_data['scrubType']) && $trigger_data['scrubType'] !== 'none',
+                    'scrubType' => $trigger_data['scrubType'] ?? 'none',
+                    'smoothness' => isset($trigger_data['smoothness']) ? floatval($trigger_data['smoothness']) : 1,
+                    'pin' => !empty($trigger_data['pin']),
                     'markers' => !empty($trigger_data['markers']),
-                    'pin' => !empty($trigger_data['pin'])
+                    'reverse' => !empty($trigger_data['reverse'])
                 ];
                 break;
                 
@@ -229,7 +231,7 @@ class GSAP_Animation_Generator {
                 break;
                 
             case 'load':
-                // Pour load, pas besoin de trigger spécial
+                // Pour load, pas besoin de paramètres supplémentaires
                 break;
         }
 
@@ -276,14 +278,30 @@ class GSAP_Animation_Generator {
                 break;
 
             case 'scroll':
-                return json_encode([
+                $scroll_config = [
                     'trigger' => "#{$timeline_id}",
                     'start' => $trigger['start'] ?? 'top center',
                     'end' => $trigger['end'] ?? 'bottom center',
-                    'scrub' => !empty($trigger['scrubType']) && $trigger['scrubType'] !== 'none',
                     'markers' => !empty($trigger['markers']),
                     'pin' => !empty($trigger['pin'])
-                ]);
+                ];
+
+                // Gestion du scrub
+                if (!empty($trigger['scrubType'])) {
+                    if ($trigger['scrubType'] === 'instant') {
+                        $scroll_config['scrub'] = true;
+                    } elseif ($trigger['scrubType'] === 'smooth') {
+                        $scroll_config['scrub'] = true;
+                        $scroll_config['scrubType'] = 'smooth';
+                        if (isset($trigger['smoothness'])) {
+                            $scroll_config['smoothness'] = floatval($trigger['smoothness']);
+                        }
+                    } elseif ($trigger['scrubType'] === 'none') {
+                        $scroll_config['scrubType'] = 'none';
+                    }
+                }
+
+                return json_encode($scroll_config);
         }
 
         return $js;
@@ -358,6 +376,7 @@ class GSAP_Animation_Generator {
                     ]
                 );
                 
+                // ScrollTrigger pour les animations standalone
                 if (!empty($animation['trigger']) && $animation['trigger']['type'] === 'scroll') {
                     $scroll_trigger = $this->handle_trigger_js($animation['elementId'], $animation['trigger']);
                     if ($scroll_trigger) {
