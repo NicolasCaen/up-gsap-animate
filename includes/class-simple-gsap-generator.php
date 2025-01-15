@@ -365,7 +365,9 @@ class GSAP_Animation_Generator {
         // Animations standalone
         if (!empty($json['standaloneAnimations'])) {
             foreach ($json['standaloneAnimations'] as $animation) {
-                $js .= "    gsap.fromTo(\"#" . $animation['elementId'] . "\",\n";
+                // Créer une constante pour l'animation
+                $animation_var = $animation['elementId'] . "Animation";
+                $js .= "    const " . $animation_var . " = gsap.fromTo(\"#" . $animation['elementId'] . "\",\n";
                 $js .= "        " . json_encode($animation['from']) . ",\n";
                 
                 $to_config = array_merge(
@@ -388,8 +390,18 @@ class GSAP_Animation_Generator {
                 $js .= "    );\n\n";
 
                 // Gestion des triggers non-scroll pour les animations standalone
-                if (!empty($animation['trigger']) && $animation['trigger']['type'] !== 'scroll') {
-                    $js .= $this->handle_trigger_js($animation['elementId'], $animation['trigger']);
+                if (!empty($animation['trigger'])) {
+                    if ($animation['trigger']['type'] === 'click') {
+                        $js .= "    document.querySelector('#" . $animation['elementId'] . "').addEventListener('click', function() {\n";
+                        $js .= "        if (" . $animation_var . ".reversed()) {\n";
+                        $js .= "            " . $animation_var . ".play();\n";
+                        $js .= "        } else {\n";
+                        $js .= "            " . $animation_var . ".reverse();\n";
+                        $js .= "        }\n";
+                        $js .= "    });\n";
+                    } elseif ($animation['trigger']['type'] !== 'scroll') {
+                        $js .= $this->handle_trigger_js($animation['elementId'], $animation['trigger']);
+                    }
                 }
             }
         }
