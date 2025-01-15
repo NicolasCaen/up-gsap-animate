@@ -141,35 +141,51 @@ class UP_GSAP_Animate {
         error_log('Element ID found: ' . $element_id);
         
         // Ajouter à la timeline ou comme animation standalone
-        if (!empty($block['attrs']['timeline'])) {
-            $timeline_id = $block['attrs']['timeline']['timelineId'];
-            error_log('Adding to timeline: ' . $timeline_id);
-            if (!isset($this->timelines[$timeline_id])) {
-                $this->timelines[$timeline_id] = array(
-                    'anchor' => $element_id,
-                    'animation' => array(
-                        'from' => isset($animation_data['from']) ? $animation_data['from'] : array(),
-                        'to' => isset($animation_data['to']) ? $animation_data['to'] : array(),
-                        'duration' => isset($animation_data['duration']) ? $animation_data['duration'] : 1,
-                        'ease' => isset($animation_data['ease']) ? $animation_data['ease'] : 'power2.out'
-                    ),
-                    'trigger' => isset($animation_data['trigger']) ? $animation_data['trigger'] : null
-                );
-                error_log('Timeline created: ' . print_r($this->timelines[$timeline_id], true));
+        if (!empty($block['attrs']['timeline']['isTimelineParent'])) {
+            error_log('Adding timeline parent');
+            $timeline_id = $element_id;
+            $this->timelines[$timeline_id] = array(
+                'anchor' => $element_id,
+                'animation' => array(
+                    'from' => isset($animation_data['from']) ? $animation_data['from'] : array(),
+                    'duration' => isset($animation_data['duration']) ? $animation_data['duration'] : 1,
+                    'ease' => isset($animation_data['ease']) ? $animation_data['ease'] : 'power2.out'
+                ),
+                'trigger' => isset($block['attrs']['trigger']) ? $block['attrs']['trigger'] : null,
+                'options' => array(
+                    'defaults' => isset($block['attrs']['timeline']['defaults']) ? $block['attrs']['timeline']['defaults'] : null,
+                    'stagger' => isset($block['attrs']['timeline']['stagger']) ? $block['attrs']['timeline']['stagger'] : null
+                ),
+                'children' => array()
+            );
+        } else if (!empty($block['attrs']['timeline']['timelineParentId'])) {
+            error_log('Adding timeline child');
+            $parent_id = $block['attrs']['timeline']['timelineParentId'];
+            $animation = array(
+                'anchor' => $element_id,
+                'animation' => array(
+                    'from' => isset($animation_data['from']) ? $animation_data['from'] : array(),
+                    'duration' => isset($animation_data['duration']) ? $animation_data['duration'] : 1,
+                    'ease' => isset($animation_data['ease']) ? $animation_data['ease'] : 'power2.out'
+                ),
+                'position' => isset($block['attrs']['timeline']['position']) ? $block['attrs']['timeline']['position'] : null
+            );
+            
+            if (!isset($this->timelines[$parent_id]['children'])) {
+                $this->timelines[$parent_id]['children'] = array();
             }
+            $this->timelines[$parent_id]['children'][] = $animation;
         } else {
             error_log('Adding standalone animation');
             $this->animations[] = array(
                 'anchor' => $element_id,
                 'animation' => array(
                     'from' => isset($animation_data['from']) ? $animation_data['from'] : array(),
-                    'to' => isset($animation_data['to']) ? $animation_data['to'] : array(),
                     'duration' => isset($animation_data['duration']) ? $animation_data['duration'] : 1,
                     'ease' => isset($animation_data['ease']) ? $animation_data['ease'] : 'power2.out'
                 ),
-                'trigger' => isset($animation_data['trigger']) ? $animation_data['trigger'] : null
+                'trigger' => isset($block['attrs']['trigger']) ? $block['attrs']['trigger'] : null
             );
-            error_log('Animation added: ' . print_r(end($this->animations), true));
         }
     }
 
@@ -231,8 +247,8 @@ class UP_GSAP_Animate {
         error_log('Timelines: ' . print_r($this->timelines, true));
 
         // Générer le code JS
-        $generator = new UP_GSAP_JS_Generator($blocks);
-        $js_code = $generator->generate_js();
+        $generator = new UP_GSAP_JS_Generator($this->animations, $this->timelines);
+        $js_code = $generator->generate();
         
         // Debug
         error_log('Generated JS: ' . $js_code);

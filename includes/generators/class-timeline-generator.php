@@ -64,27 +64,24 @@ class UP_GSAP_Timeline_Generator extends UP_GSAP_Base_Generator {
         $js .= !empty($timeline_options) ? implode(",\n", $timeline_options) . "\n    });\n\n" : "    });\n\n";
 
         // Trouver les enfants de cette timeline
-        $timeline_children = $this->get_timeline_children($timeline_id);
-
-        // Ajouter les animations enfants
-        if (!empty($timeline_children)) {
+        if (!empty($timeline['children'])) {
             $js .= "    // Animations de la timeline\n";
             $js .= "    timeline_" . str_replace('-', '_', $timeline_id) . "\n";
             
-            foreach ($timeline_children as $index => $child) {
+            foreach ($timeline['children'] as $index => $child) {
                 if (empty($child['anchor'])) continue;
 
                 $animation = $this->generate_animation_props($child['animation']);
                 
                 // Position dans la timeline
                 $position = "";
-                if ($index > 0) {
-                    $position = ", '-=0.5'"; // Chevauchement par défaut
+                if (!empty($child['position'])) {
+                    $position = ", '" . $child['position'] . "'";
                 }
 
                 $js .= "        ." . $animation['method'] . "('#" . $child['anchor'] . "', {\n";
                 $js .= implode(",\n", $animation['props']) . "\n";
-                $js .= "        }" . $position . ")" . ($index < count($timeline_children) - 1 ? "\n" : ";\n\n");
+                $js .= "        }" . $position . ")" . ($index < count($timeline['children']) - 1 ? "\n" : ";\n\n");
             }
         }
 
