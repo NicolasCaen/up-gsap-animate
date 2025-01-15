@@ -269,22 +269,31 @@ export const AnimationPanel = ({ attributes, setAttributes, timelineInfo, anchor
                             { label: __('On Hover', 'up-gsap-animate'), value: 'hover' },
                             { label: __('On Click', 'up-gsap-animate'), value: 'click' }
                         ]}
-                        onChange={(type) => updateTrigger({ type })}
+                        onChange={(type) => updateTrigger({ ...trigger, type })}
                     />
+
+                    {trigger.type && trigger.type !== 'load' && (
+                        <TextControl
+                            label={__('Trigger Element', 'up-gsap-animate')}
+                            help={__('CSS selector of the trigger element. Leave empty to use the animated element.', 'up-gsap-animate')}
+                            value={trigger.triggerElement || ''}
+                            onChange={(triggerElement) => updateTrigger({ ...trigger, triggerElement })}
+                        />
+                    )}
 
                     {trigger.type === 'scroll' && (
                         <>
                             <TextControl
                                 label={__('Start Position', 'up-gsap-animate')}
                                 value={trigger.start}
-                                onChange={(start) => updateTrigger({ start })}
+                                onChange={(start) => updateTrigger({ ...trigger, start })}
                                 help={__('Example: "top center"', 'up-gsap-animate')}
                             />
 
                             <TextControl
                                 label={__('End Position', 'up-gsap-animate')}
                                 value={trigger.end}
-                                onChange={(end) => updateTrigger({ end })}
+                                onChange={(end) => updateTrigger({ ...trigger, end })}
                                 help={__('Optional. Leave empty for default', 'up-gsap-animate')}
                             />
 
@@ -296,14 +305,14 @@ export const AnimationPanel = ({ attributes, setAttributes, timelineInfo, anchor
                                     { label: __('Smooth', 'up-gsap-animate'), value: 'smooth' },
                                     { label: __('Instant', 'up-gsap-animate'), value: 'instant' }
                                 ]}
-                                onChange={(scrubType) => updateTrigger({ scrubType })}
+                                onChange={(scrubType) => updateTrigger({ ...trigger, scrubType })}
                             />
 
                             {trigger.scrubType === 'smooth' && (
                                 <RangeControl
                                     label={__('Smoothness', 'up-gsap-animate')}
                                     value={trigger.smoothness}
-                                    onChange={(smoothness) => updateTrigger({ smoothness })}
+                                    onChange={(smoothness) => updateTrigger({ ...trigger, smoothness })}
                                     min={0.1}
                                     max={10}
                                     step={0.1}
@@ -313,13 +322,13 @@ export const AnimationPanel = ({ attributes, setAttributes, timelineInfo, anchor
                             <ToggleControl
                                 label={__('Pin Element', 'up-gsap-animate')}
                                 checked={trigger.pin}
-                                onChange={(pin) => updateTrigger({ pin })}
+                                onChange={(pin) => updateTrigger({ ...trigger, pin })}
                             />
 
                             <ToggleControl
                                 label={__('Show Debug Markers', 'up-gsap-animate')}
                                 checked={trigger.markers}
-                                onChange={(markers) => updateTrigger({ markers })}
+                                onChange={(markers) => updateTrigger({ ...trigger, markers })}
                             />
                         </>
                     )}
@@ -328,7 +337,7 @@ export const AnimationPanel = ({ attributes, setAttributes, timelineInfo, anchor
                         <ToggleControl
                             label={__('Reverse on Leave', 'up-gsap-animate')}
                             checked={trigger.reverse}
-                            onChange={(reverse) => updateTrigger({ reverse })}
+                            onChange={(reverse) => updateTrigger({ ...trigger, reverse })}
                         />
                     )}
                 </PanelBody>

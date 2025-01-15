@@ -138,10 +138,6 @@ class UP_GSAP_Animate {
             return;
         }
 
-       //error_log("=== POST Content  ROW===");
-       //error_log($content);
-       //error_log("=== POST Content  ROW ===");
-
         // Générer le code JS
         $js_code = $this->js_generator->generate_animations($content);
         if (!$js_code) {
@@ -155,9 +151,38 @@ class UP_GSAP_Animate {
             wp_mkdir_p($gsap_dir);
         }
 
-        // Sauvegarder dans un fichier
-        $file_path = $gsap_dir . '/page-' . $post_id . '.js';
-        file_put_contents($file_path, $js_code);
+        // Sauvegarder le fichier JS
+        $js_file = $gsap_dir . '/page-' . $post_id . '.js';
+        file_put_contents($js_file, $js_code);
+
+        // Extraire la structure pour le fichier JSON
+        $blocks = parse_blocks($content);
+        $animations = array();
+        $timelines = array();
+        
+        foreach ($blocks as $block) {
+            if (!empty($block['attrs']['gsapAnimation'])) {
+                $animations[] = $block['attrs']['gsapAnimation'];
+            }
+            if (!empty($block['attrs']['timeline'])) {
+                $timelines[] = $block['attrs']['timeline'];
+            }
+        }
+
+        // Créer le dossier structure si nécessaire
+        $structure_dir = $theme_dir . '/assets/js/structure';
+        if (!file_exists($structure_dir)) {
+            wp_mkdir_p($structure_dir);
+        }
+
+        // Sauvegarder le fichier structure
+        $structure_file = $structure_dir . '/page-' . $post_id . '.json';
+        $json_content = json_encode(array(
+            'timelines' => $timelines,
+            'standaloneAnimations' => $animations
+        ), JSON_PRETTY_PRINT);
+
+        file_put_contents($structure_file, $json_content);
     }
 }
 
