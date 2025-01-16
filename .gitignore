@@ -4,28 +4,21 @@
 
 # Build files
 /build
+*.map
 
-# Environment files
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-
-# Editor files
-.DS_Store
-.vscode/
+# IDE and Editor files
 .idea/
+.vscode/
+*.swp
+*~
 
-# Logs
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+# OS files
+.DS_Store
+Thumbs.db
 
-# PHPUnit
-.phpunit.result.cache
-.phpunit.cache/
-/tests/coverage/
-/tests/tmp/
-/tests/wordpress/
-/tests/wordpress-tests-lib/
+# Misc
+*.log
+*.zip
+*.bak
+*.cache
+.cache/
