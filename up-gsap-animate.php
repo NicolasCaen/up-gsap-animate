@@ -2,7 +2,7 @@
 /**
  * Plugin Name: UP GSAP Animate
  * Description: Add GSAP animations to your blocks
- * Version: 0.2.0
+ * Version: 1.0.0
  * Author: UP
  */
 
