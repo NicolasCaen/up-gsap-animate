@@ -162,10 +162,18 @@ class UP_GSAP_Animate {
         
         foreach ($blocks as $block) {
             if (!empty($block['attrs']['gsapAnimation'])) {
-                $animations[] = $block['attrs']['gsapAnimation'];
+                $animation = $block['attrs']['gsapAnimation'];
+                if (!empty($block['attrs']['trigger'])) {
+                    $animation['trigger'] = $block['attrs']['trigger'];
+                }
+                $animations[] = $animation;
             }
             if (!empty($block['attrs']['timeline'])) {
-                $timelines[] = $block['attrs']['timeline'];
+                $timeline = $block['attrs']['timeline'];
+                if (!empty($block['attrs']['trigger'])) {
+                    $timeline['trigger'] = $block['attrs']['trigger'];
+                }
+                $timelines[] = $timeline;
             }
         }
 

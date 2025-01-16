@@ -235,6 +235,11 @@ class GSAP_Animation_Generator {
                 break;
         }
 
+        // Ajouter triggerElement s'il est défini
+        if (!empty($trigger_data['triggerElement'])) {
+            $trigger['triggerElement'] = $trigger_data['triggerElement'];
+        }
+
         return $trigger;
     }
 
