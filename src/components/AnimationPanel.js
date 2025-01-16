@@ -12,7 +12,11 @@ import {
 import { useEffect } from '@wordpress/element';
 
 // Récupérer les animations depuis PHP
-const { animations: phpAnimations = {}, easings: phpEasings = [] } = window.upGsapAnimateSettings || {};
+const { 
+    animations: phpAnimations = {}, 
+    easings: phpEasings = [], 
+    triggers: phpTriggers = [] 
+} = window.upGsapAnimateSettings || {};
 
 export const AnimationPanel = ({ attributes, setAttributes, timelineInfo, anchor }) => {
     const { gsapAnimation, trigger, timeline } = attributes;
@@ -92,7 +96,7 @@ export const AnimationPanel = ({ attributes, setAttributes, timelineInfo, anchor
             from: { opacity: 0, scale: 0.5 },
             to: { opacity: 1, scale: 1 }
         },
-        ...phpAnimations
+        ...phpAnimations // Ajout des animations personnalisées depuis PHP
     };
 
     // Options d'easing
@@ -104,7 +108,17 @@ export const AnimationPanel = ({ attributes, setAttributes, timelineInfo, anchor
         { label: 'Back Out', value: 'back.out(1.7)' },
         { label: 'Elastic Out', value: 'elastic.out(1, 0.3)' },
         { label: 'Bounce Out', value: 'bounce.out' },
-        ...phpEasings
+        ...phpEasings // Ajout des easings personnalisés depuis PHP
+    ];
+
+    // Options de trigger
+    const triggerOptions = [
+        { label: __('On Enter', 'up-gsap-animate'), value: 'enter' },
+        { label: __('On Leave', 'up-gsap-animate'), value: 'leave' },
+        { label: __('On Enter/Leave', 'up-gsap-animate'), value: 'enter-leave' },
+        { label: __('On Click', 'up-gsap-animate'), value: 'click' },
+        { label: __('On Hover', 'up-gsap-animate'), value: 'hover' },
+        ...phpTriggers // Ajout des triggers personnalisés depuis PHP
     ];
 
     const animationRoles = [
@@ -263,12 +277,7 @@ export const AnimationPanel = ({ attributes, setAttributes, timelineInfo, anchor
                     <SelectControl
                         label={__('Trigger Type', 'up-gsap-animate')}
                         value={trigger.type}
-                        options={[
-                            { label: __('On Scroll', 'up-gsap-animate'), value: 'scroll' },
-                            { label: __('On Load', 'up-gsap-animate'), value: 'load' },
-                            { label: __('On Hover', 'up-gsap-animate'), value: 'hover' },
-                            { label: __('On Click', 'up-gsap-animate'), value: 'click' }
-                        ]}
+                        options={triggerOptions}
                         onChange={(type) => updateTrigger({ ...trigger, type })}
                     />
 

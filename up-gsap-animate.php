@@ -18,6 +18,7 @@ class UP_GSAP_Animate {
         // Charger les dépendances
         require_once plugin_dir_path(__FILE__) . 'includes/class-simple-gsap-generator.php';
         require_once plugin_dir_path(__FILE__) . 'includes/class-admin.php';
+        require_once plugin_dir_path(__FILE__) . 'includes/hooks.php';
 
         // Initialiser les composants
         $this->admin = new UP_GSAP_Admin();
@@ -99,8 +100,9 @@ class UP_GSAP_Animate {
         wp_add_inline_script(
             'up-gsap-animate-editor',
             'window.upGsapAnimateSettings = ' . json_encode(array(
-                'animations' => apply_filters('up_gsap_animate_animations', array()),
-                'easings' => apply_filters('up_gsap_animate_easings', array())
+                'animations' => up_gsap_get_animations(array()),
+                'easings' => up_gsap_get_easings(array()),
+                'triggers' => up_gsap_get_triggers(array())
             )),
             'before'
         );
